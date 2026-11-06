@@ -45,6 +45,7 @@ void MediaManager::setSampleRate(double sampleRate) {
         if (sampleRate == sampleRate_) return;
         sampleRate_ = sampleRate;
         ready_.clear(); // Snapshots keep the old ones alive for as long as they're in use.
+        peaks_.clear(); // Their positions are in frames at the old rate.
         failed_.clear();
     }
     wake_.notify_all();
