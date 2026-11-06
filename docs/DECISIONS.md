@@ -13,7 +13,7 @@ Newest decisions override the master spec where they conflict. "Owner" decisions
 **ADR-005: Performance targets** (2026-11-06, owner delegated). The goal is no stutter or quality loss from low-end to high-end machines, with modern laptops as the likely user hardware. The spec's 4-core, 8 GB reference is not a real machine here, so results are recorded at these tiers:
 - **Tier 1, baseline:** the development PC (Ryzen 7 7700X, 16 logical cores, 31 GB, RX 6600 XT). Regression gates of spec section 7 apply here.
 - **Tier 2, low-end proxy:** the same PC limited to 4 logical cores from Phase 01 on, reported as a proxy and never as real low-end hardware.
-- **Tier 3, real laptop:** run before v1.0 acceptance; currently no laptop is recorded.
+- **Tier 3, real laptop:** the owner has a laptop available. Record its model and run the benchmarks before v1.0 acceptance, and earlier when useful.
 
 The numeric goals in spec section 7 stay. CPU is always reported against both one logical core and the whole system, because a whole-system figure flatters a 16-thread machine. A smooth result on every machine cannot be promised: the app measures and reports instead.
 
@@ -33,6 +33,6 @@ The numeric goals in spec section 7 stay. CPU is always reported against both on
 
 **ADR-013: Virtual MIDI and the APC Mini** (2026-11-06, owner hardware). No MIDI keyboard is available. Use the Akai APC Mini for physical MIDI input, launching and LED output tests. Pads do not exercise a full velocity range, sustain or pitch bend, so test those with synthetic events and record that those physical checks are not covered.
 
-**OPEN-001: Plug-in licensing exception.** Should the GPL license carry an additional permission (GPLv3 section 7) for loading non-GPL plug-ins and drivers? The owner has not decided. `LICENSE` is unmodified GPL-3.0-or-later until then.
+**ADR-014: Plug-in and driver licensing permission** (2026-11-06, owner). The project is GPL-3.0-or-later with a GPLv3 section 7 additional permission in `LICENSE-EXCEPTION.md`, allowing combination at runtime with non-GPL plug-ins and audio or MIDI drivers. `LICENSE` stays the unmodified GPL text. Contributions are accepted under the same terms. The permission cannot cover third-party GPL components, so check how each one (Rubber Band, the ASIO SDK) interacts with it during that dependency's audit. Not legal advice.
 
-**OPEN-002: ASIO driver for testing.** No ASIO driver is installed. Needed by Phase 04 or 12. Options are in KNOWN_ISSUES. The spec's sign-off requires a real ASIO interface, and a wrapper driver does not satisfy that without an owner decision.
+**OPEN-002: ASIO driver for testing.** No ASIO driver is installed. Needed by Phase 04 or 12. The owner is confirming whether an audio interface is available. Options are in KNOWN_ISSUES. The spec's sign-off requires a real ASIO interface, and a wrapper driver does not satisfy that without an owner decision.

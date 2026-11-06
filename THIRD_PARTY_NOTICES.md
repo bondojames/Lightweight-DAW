@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-LightweightDAW is licensed under GPL-3.0-or-later (see `LICENSE`). It includes the components below, each under its own terms. This is an engineering audit record, not legal advice.
+LightweightDAW is licensed under GPL-3.0-or-later (see `LICENSE`) with an additional permission for loading non-GPL plug-ins and drivers (see `LICENSE-EXCEPTION.md`). It includes the components below, each under its own terms. This is an engineering audit record, not legal advice.
 
 ## Shipped in the Phase 00 program
 

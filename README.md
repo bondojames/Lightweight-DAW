@@ -38,4 +38,4 @@ powershell -ExecutionPolicy Bypass -File tools/profile.ps1
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+GPL-3.0-or-later, with an [additional permission](LICENSE-EXCEPTION.md) for loading non-GPL plug-ins and drivers. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

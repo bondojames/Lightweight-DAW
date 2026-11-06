@@ -24,6 +24,7 @@ if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir }
 New-Item -ItemType Directory -Force (Join-Path $outDir 'licenses') | Out-Null
 Copy-Item $exe $outDir
 Copy-Item (Join-Path $root 'LICENSE') $outDir
+Copy-Item (Join-Path $root 'LICENSE-EXCEPTION.md') $outDir
 Copy-Item (Join-Path $root 'THIRD_PARTY_NOTICES.md') $outDir
 Copy-Item (Join-Path $root 'packaging\portable\README_FIRST.txt') $outDir
 Copy-Item (Join-Path $root '.deps\imgui-src\LICENSE.txt') (Join-Path $outDir 'licenses\imgui-LICENSE.txt')

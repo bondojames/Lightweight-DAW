@@ -26,7 +26,8 @@ To keep them beside the program instead, put an empty file named portable.flag
 next to LightweightDAW.exe (the folder must be writable).
 
 LICENSE
-GPL-3.0-or-later; see LICENSE. Third-party notices: THIRD_PARTY_NOTICES.md and
+GPL-3.0-or-later with a permission for loading non-GPL plug-ins and drivers; see
+LICENSE and LICENSE-EXCEPTION.md. Third-party notices: THIRD_PARTY_NOTICES.md and
 the licenses folder. Source code: see the project repository.
 
 KNOWN ISSUES
