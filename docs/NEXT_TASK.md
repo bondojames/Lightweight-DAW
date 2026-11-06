@@ -1,21 +1,21 @@
 # Next Engineering Task
-Phase / issue: Phase 02 (audio track arrangement, import and playback).
+Phase / issue: Phase 03 (browser, project save and load, undo, recovery), once the owner finishes `tests/manual/phase-02.md`.
 
-User-visible outcome: drop an audio file onto a track, move and trim it, play it from any point, and loop a region.
+User-visible outcome: create a multi-clip project, save it to a folder, close the app, reopen it and keep editing.
 
 Scope (maximum 3 bounded deliverables):
-1. `core/model` Project, Track, Clip and MediaSource; the undoable command layer (ADR-009); immutable runtime graph snapshots published to the callback with safe retirement.
-2. Media: libsndfile and libsamplerate after license audit, Media Foundation for MP3 and M4A, worker-thread prefetch, multiresolution waveform peaks.
-3. Custom ImGui timeline: clipped waveforms, zoom, selection, move, trim, split, duplicate, snap, seek, loop, gain, pan, clip-edge fades.
+1. Project schema v1 with a migration entry point: human-readable JSON, stable UUIDs, relative media paths, atomic save with a last-known-good backup. Audit and pin a JSON library first.
+2. New, Open, Save, Save As; autosave timer with a recovery selector that never overwrites the user's file; missing media placeholders and relink.
+3. Asynchronous in-app folder browser with search, favourites, preview and drag to the timeline.
 
-Out of scope: save and load, browser, recording, MIDI.
+Out of scope: recording, MIDI, plug-ins.
 
-Files/subsystems likely affected: new `core/model`, `core/commands`, `core/assets`; `engine/graph`; `ui/arrangement`; pins in `cmake/Dependencies.cmake`.
+Files/subsystems likely affected: new `core/persistence`, `ui/library`; `core/model`, `core/commands`, `app/Application.cpp`; `engine/media` for cache cleanup (KI-016) and on-demand CJK fonts (KI-002).
 
-Dependencies and migration needs: audit libsndfile (LGPL; must be a DLL) and libsamplerate before pinning. `package.ps1` must allow only reviewed DLLs. ADR-006 applies: no CRT objects across DLL boundaries.
+Dependencies and migration needs: `model::Id` is a counter today and must become stable UUIDs before the first file is written. Commit a small redistributable MP3 fixture (KI-015). Replace main-window file drop with OLE so detached panels accept drops (KI-001).
 
-Acceptance tests (automated + physical where needed): spec Phase 02 list. Mono and stereo imports at native and resampled rates; no UI stall on a large file; no click at a faded split; measured alignment of identical files across tracks; 10-minute playlist with no callback disk I/O; source media unchanged; allocation counter still 0 in the callback.
+Acceptance tests (automated + physical where needed): spec Phase 03 list. Deterministic project round trip of audio, mixer and clip timing; killing the app mid-save leaves the last good project intact; a moved project folder still finds relative media; unplugged media stays as a placeholder; recovery asks rather than replacing the original; an example session ZIP.
 
-Required packaged output: `builds/phase-02/`, ZIP, SHA-256 and log.
+Required packaged output: `builds/phase-03/`, ZIP, SHA-256 and log.
 
 Failure/rollback policy: do not replace the last accepted tag or build.

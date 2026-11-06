@@ -128,6 +128,65 @@ Checklist: `tests/manual/phase-01.md`. Performed by the owner on 2026-11-06, and
 
 Run on commit 9b20cce: success, on a runner with no GPU.
 
+## Phase 02, automated, run 2026-11-06
+
+Package commit f0c7b2a. Same machine as above.
+
+| Check | Result |
+|---|---|
+| Release build from a fresh clone of f0c7b2a | PASS |
+| CTest `unit`: 142 cases | PASS |
+| CTest `app_ui_self_test`: 20 steps, adding import, clip playback with no disk misses, split and undo, and a bad file | PASS |
+| Extracted ZIP runs with no developer PATH; the only non-Windows DLL is the reviewed `sndfile.dll` | PASS |
+| WAV and AIFF import, mono and stereo, sample-exact at the native rate | PASS |
+| Resampled import from 44.1 kHz to 22.05, 48 and 96 kHz: correct length and pitch | PASS |
+| FLAC and M4A import through Media Foundation | PASS, with fixtures made by Windows' own encoders |
+| MP3 import | **NOT TESTED.** Windows has no MP3 encoder to make a fixture, so the test skips it. Hands-on check 2 covers it |
+| Bad, empty, missing and truncated files fail cleanly and leave nothing behind | PASS |
+| Source file unmodified by import | PASS (modified time and size) |
+| Non-destructive edit math: move, trim, split, duplicate, undo, redo | PASS |
+| Clip plays its exact samples at its exact position | PASS |
+| Identical files on two tracks sum to exactly double; inverted copies null below 1e-5 | PASS |
+| A split is inaudible; cutting into full-level audio causes no click | PASS |
+| Loop wraps sample-accurately; output is identical at any block size | PASS |
+| Mute, solo, constant-power pan and smoothed gain | PASS |
+| No heap allocation or disk read in the callback path while playing clips | PASS |
+| A missing disk block plays as counted silence, not a stall | PASS |
+| Position math monotonic past 2 hours at 96 kHz | PASS |
+
+Bugs these tests caught, now fixed: the resampler dropped about 50 frames from the end of every converted file, and a stale preload answer let playback start with one silent callback.
+
+### Playlist through the real device (silent, gain 0, 48 kHz, 256 frames, High Definition Audio Device, 8 tracks, a seek every minute)
+
+| Run | Length | Callbacks | p99 load | Peak | Dropouts | Disk misses | Callback allocations | Callback disk reads |
+|---|---|---|---|---|---|---|---|---|
+| Tier 1 | 10 min | 112,535 | at most 0.5% | 1.33% | 0 | 0 | 0 | 0 |
+| Tier 2 proxy, 4 logical cores | 5 min | 56,267 | at most 0.5% | 1.85% | 0 | 0 | 0 | 0 |
+
+Limits of this evidence:
+- All 8 tracks play the same file at nearly the same position, so they share blocks. It tests mixing cost and streaming, but it is not 8 independent disk streams.
+- The file was freshly written, so the OS disk cache likely served it. A slow or cold disk is untested.
+- It ran on this PC's SSD, not on low-end storage.
+
+### Long file (30 minutes, 48 kHz stereo)
+
+Import took 0.47 s with the source in the OS disk cache, and the file needs 4,520 KiB of waveform data and a 659 MiB cache file.
+
+### UI cost with that file on the timeline (60-second settle, 60-second window, Hesh Evo at 44.1 kHz, the file resampled by the app first)
+
+| Mode | UI frames/s | Process CPU, % of one core | % of whole system | Max draw calls | Max vertices | Max working set | Dropouts |
+|---|---|---|---|---|---|---|---|
+| Idle | 9.98 | 0.443 | 0.028 | 16 | 10,083 | 52.3 MiB | 0 |
+| Playing (silent) | 29.73 | 1.641 | 0.103 | 16 | 10,129 | 52.5 MiB | 0 |
+
+Vertex count stays bounded because only on-screen columns are drawn. The 100-track visual fixture in spec section 7 is not built yet.
+
+GitHub Actions has not run Phase 02, because it isn't pushed yet.
+
+## Phase 02, hands-on
+
+Checklist: `tests/manual/phase-02.md`. All 18 rows: PENDING.
+
 ## Not run
 
 | Check | Why |
@@ -135,4 +194,3 @@ Run on commit 9b20cce: success, on a runner with no GPU.
 | Clean-system run | Not yet run on the laptop |
 | Windows 10 | Out of scope (ADR-004) |
 | Real driver failure | Only a simulated device reset (KI-005) |
-| Real device unplug | Scripted backend only; listening check 10 covers it |

@@ -1,21 +1,21 @@
 {
-  "phase": "01",
-  "status": "ACCEPTED",
-  "commit": "174b23789957",
-  "toolchain": {"compiler": "MSVC", "compilerVersion": "14.44.35207", "imguiDockingVersion": "v1.93.0-docking b916186e66aa3c02b72c6ca17455516512ed8049", "graphics": "Win32+D3D11"},
+  "phase": "02",
+  "status": "IMPLEMENTED_UNVERIFIED",
+  "commit": "f0c7b2a407b8",
+  "toolchain": {"compiler": "MSVC", "compilerVersion": "14.44.35207", "imguiDockingVersion": "v1.93.0-docking b916186e66aa3c02b72c6ca17455516512ed8049", "graphics": "Win32+D3D11", "libsndfile": "1.2.2 72f6af15e8f85157bd622ed45b979025828b7001", "libsamplerate": "0.2.2 c96f5e3de9c4488f4e6c97f59f5245f22fda22f7"},
   "artifact": {
-    "path": "builds/phase-01/LightweightDAW.exe",
-    "sha256": "cfd6bc436808c5480c0f6124f2fa4b22af43bbec92a64ce2454a80434a803550",
-    "zipPath": "builds/LightweightDAW-phase-01-win64.zip",
-    "zipSha256": "c81e1bd503a8b0e703e0888937eacc4dc3ae6901609f4dddf2d4b5c9554b5fc5"
+    "path": "builds/phase-02/LightweightDAW.exe",
+    "sha256": "60dda0848156e00eee1d6184a4632446e9715bd059bec33f1494cececa142aa5",
+    "zipPath": "builds/LightweightDAW-phase-02-win64.zip",
+    "zipSha256": "162197c0a51e4c9c8de2771bf5a65eca08bb8820b8270886fcf84ad57fae503d"
   },
   "testRun": {
     "hostOS": "Windows 11 Pro build 26200",
     "dateUTC": "2026-11-06",
     "passed": 3,
     "failed": 0,
-    "blocked": []
+    "blocked": ["18 hands-on checks pending", "MP3 import never run", "GitHub Actions not yet run on this code"]
   },
-  "uiBenchmark": {"cpu": "AMD Ryzen 7 7700X", "gpu": "AMD Radeon RX 6600 XT", "monitors": 1, "idleCpuPctOfOneCore": 0.729, "idleUiFps": 9.98, "idleWorkingSetMiB": 45.4},
-  "audioBenchmark": {"device": "Speakers (High Definition Audio Device)", "sampleRate": 48000, "frames": 256, "p99CallbackLoadPct": 0.5, "peakCallbackLoadPct": 2.71, "xruns": 0, "seconds": 1800, "note": "Metronome only, silent output, no tracks yet. p99 is the upper edge of a 0.5% histogram bin."}
+  "uiBenchmark": {"cpu": "AMD Ryzen 7 7700X", "gpu": "AMD Radeon RX 6600 XT", "monitors": 1, "idleCpuPctOfOneCore": 0.443, "playingCpuPctOfOneCore": 1.641, "idleUiFps": 9.98, "maxWorkingSetMiB": 52.5},
+  "audioBenchmark": {"device": "Speakers (High Definition Audio Device)", "sampleRate": 48000, "frames": 256, "tracks": 8, "p99CallbackLoadPct": 0.5, "peakCallbackLoadPct": 1.33, "xruns": 0, "diskMissFrames": 0, "seconds": 600, "note": "Silent output. All tracks play one file, so this is not 8 independent disk streams. p99 is the upper edge of a 0.5% histogram bin."}
 }

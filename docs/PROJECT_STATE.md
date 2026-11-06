@@ -1,9 +1,9 @@
 # Project State
 Spec: v2.0, with changes in `docs/DECISIONS.md` | Current branch: main | HEAD: see `git log`
 Accepted phase: 01 (tag phase-01-accepted). Phase 00 is BLOCKED only on its three dual-monitor checks.
-Active phase/task: Phase 02 | Status: IN_PROGRESS
-Toolchain/deps: MSVC 14.44 (VS 2022 Build Tools), CMake 4.4.4, Ninja, Windows SDK 10.0.26100; Dear ImGui v1.93.0-docking at b916186e; WASAPI from Windows, no audio SDKs
-Verified builds: `builds/phase-01/`, built from 174b237; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
+Active phase/task: Phase 02 | Status: IMPLEMENTED_UNVERIFIED, awaiting hands-on checks
+Toolchain/deps: MSVC 14.44 (VS 2022 Build Tools), CMake 4.4.4, Ninja, Windows SDK 10.0.26100; Dear ImGui v1.93.0-docking at b916186e; libsndfile 1.2.2 at 72f6af15 (DLL); libsamplerate 0.2.2 at c96f5e3d; WASAPI and Media Foundation from Windows
+Verified builds: `builds/phase-02/`, built from f0c7b2a; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
 Repository: https://github.com/bondojames/Lightweight-DAW (public)
 
 Implemented today (verified by automated tests or a real run):
@@ -13,7 +13,10 @@ Implemented today (verified by automated tests or a real run):
 - `AudioService`: device work on a control thread; no-device message, reconnect, follows the Windows default, falls back from a missing saved device.
 - Lock-free commands (UI to audio) and telemetry (audio to UI): load percentiles, dropouts by cause.
 - UI: transport, Space bar, metronome, tone, BPM, device, rate and buffer settings, audio diagnostics, offline metronome test.
-- `LightweightDAW_audiotest.exe`: headless device tests, including timing through Windows loopback.
+- `LightweightDAW_audiotest.exe`: headless device tests, including loopback timing, an 8-track playlist and a long-file import benchmark.
+- Phase 02: immutable project versions with undo; import via libsndfile and Media Foundation with resampling and a float cache; waveform pyramid; arrangement snapshots; block disk streaming with a preload gate; timeline and inspector UI. There is no save yet.
+
+MP3 import has never been run, and no person has used the timeline yet: `tests/manual/phase-02.md`.
 
 Owner confirmed all 12 Phase 01 listening checks: `tests/manual/phase-01.md`.
 
@@ -27,13 +30,14 @@ Key invariants:
 
 Build command: `tools\build.cmd release`
 Test command: `ctest --preset release` after a build, from an MSVC x64 environment
-Package command: `tools\package.cmd 01`
-Benchmark: `tools\profile.ps1` and `LightweightDAW_audiotest run`. 7700X, 48 kHz, 256 frames: p99 load at most 0.5%, peak 2.71%, 0 dropouts in 30 minutes. UI idle with audio open: 0.73% of one core, 45 MiB.
+Package command: `toolspackage.cmd 02`
+Benchmark: `toolsprofile.ps1` and `LightweightDAW_audiotest`. 7700X, 48 kHz, 256 frames, 8 tracks: p99 load at most 0.5%, peak 1.33%, 0 dropouts and 0 disk misses in 10 minutes. UI with a clip: idle 0.44%, playing 1.64% of one core, 52 MiB.
 
 Blocking issues:
 - Phase 00 checks 4, 13, 14 need a second display.
+- Phase 02 hands-on checks pending.
 - Laptop results not yet recorded (ADR-005 Tier 3).
 - OPEN-002: ASIO driver and audio interface.
 
-Decisions changed since last handoff: ADR-015 to ADR-017.
+Decisions changed since last handoff: ADR-018 to ADR-023.
 Next file: docs/NEXT_TASK.md
