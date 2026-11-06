@@ -64,6 +64,8 @@ void AudioEngine::beginPreloadWait() noexcept {
         pendingPreload_.store(kNoPendingPreload, std::memory_order_release);
         return;
     }
+    // Forget any earlier answer: it may be for this same position, but for an older arrangement.
+    preloadedFrame_.store(kNoPendingPreload, std::memory_order_release);
     waitingForPreload_ = true;
     preloadWaitLeft_ = static_cast<std::int64_t>(tempo_.sampleRate() * kPreloadWaitSeconds);
     pendingPreload_.store(position_, std::memory_order_release);

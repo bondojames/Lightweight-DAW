@@ -218,6 +218,8 @@ void Application::stepSelfTest(double time) {
     if (!passed) ++selfTestFailures_;
     if (!passed) {
         // Enough state to diagnose a failure from the log alone.
+        const engine::EngineState audio = audio_->engineState();
+        log::info(std::format("  audio playing={} position={} rate={:.0f} diskMisses={} blocks={}", audio.playing, audio.positionFrames, audio.sampleRate, audio_->diskMissFrames(), audio_->streamedBlocks()));
         for (const ImGuiViewport* viewport : ImGui::GetPlatformIO().Viewports) {
             log::info(std::format("  viewport pos {:.0f},{:.0f} size {:.0f}x{:.0f} flags 0x{:X}", viewport->Pos.x, viewport->Pos.y, viewport->Size.x, viewport->Size.y, static_cast<int>(viewport->Flags)));
         }

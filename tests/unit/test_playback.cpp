@@ -390,3 +390,45 @@ TEST_CASE(no_heap_or_disk_use_while_playing_clips) {
     CHECK(ldawRealtimeAllocations() == allocationsBefore);
     CHECK(g_realtimeDiskReads.load() == readsBefore);
 }
+
+TEST_CASE(a_stale_preload_answer_does_not_start_playback_early) {
+    Rig rig;
+    const auto source = sineWave(48000, 440.0);
+    const Id media = rig.media(makeMedia(L"gate.wav", source, source), L"gate");
+    addClip(rig.project, rig.track, media, 0);
+    rig.publish();
+    rig.engine.setPreloadGate(true);
+
+    // An earlier Play at position 0 was answered.
+    rig.engine.post({EngineCommandType::Play, 0.0});
+    (void)renderOffline(rig.engine, 128, kRate, 128);
+    rig.engine.markPreloaded(0);
+    (void)renderOffline(rig.engine, 128, kRate, 128);
+    CHECK(rig.engine.state().positionFrames == 128);
+
+    // Stopped and rewound, then played again: it must wait for a new answer.
+    rig.engine.post({EngineCommandType::Stop, 0.0});
+    (void)renderOffline(rig.engine, 4800, kRate, 128);
+    rig.engine.post({EngineCommandType::Rewind, 0.0});
+    rig.engine.post({EngineCommandType::Play, 0.0});
+    (void)renderOffline(rig.engine, 256, kRate, 128);
+    CHECK(rig.engine.state().positionFrames == 0);
+    CHECK(rig.engine.pendingPreloadFrame() == 0);
+    rig.engine.markPreloaded(0);
+    (void)renderOffline(rig.engine, 128, kRate, 128);
+    CHECK(rig.engine.state().positionFrames == 128);
+    rig.engine.setPreloadGate(false);
+}
+
+TEST_CASE(preload_wait_gives_up_after_a_bounded_time) {
+    Rig rig;
+    const auto source = sineWave(48000, 440.0);
+    const Id media = rig.media(makeMedia(L"gate2.wav", source, source), L"gate2");
+    addClip(rig.project, rig.track, media, 0);
+    rig.publish();
+    rig.engine.setPreloadGate(true);
+    rig.engine.post({EngineCommandType::Play, 0.0});
+    (void)renderOffline(rig.engine, 48000, kRate, 128); // One second, and no streamer ever answers.
+    CHECK(rig.engine.state().positionFrames > 0);
+    rig.engine.setPreloadGate(false);
+}
