@@ -1,20 +1,20 @@
 {
   "phase": "00",
-  "status": "IMPLEMENTED_UNVERIFIED",
-  "commit": "11efa22f0df5",
+  "status": "BLOCKED",
+  "commit": "4de4dce59385",
   "toolchain": {"compiler": "MSVC", "compilerVersion": "14.44.35207", "imguiDockingVersion": "v1.93.0-docking b916186e66aa3c02b72c6ca17455516512ed8049", "graphics": "Win32+D3D11"},
   "artifact": {
     "path": "builds/phase-00/LightweightDAW.exe",
-    "sha256": "90bc31c0c2bf87d6f29931dfedc569f0df5ec4bf85e7aa3b65e53c1198260dc6",
+    "sha256": "8b436c3e86308fc719a66397af44b0b50dcb283c7f1a0ea7344a1e81ea10a61f",
     "zipPath": "builds/LightweightDAW-phase-00-win64.zip",
-    "zipSha256": "1e0f42f7bf1f3c6d0d3f33b110dc8d11a5bd72eed70b61026eed7da6b358fb6c"
+    "zipSha256": "0ae94d7b3beda7afe9849c20e2d69121aa7ea66fa6f0a7b63135437831ee88f0"
   },
   "testRun": {
     "hostOS": "Windows 11 Pro build 26200",
     "dateUTC": "2026-11-06",
     "passed": 3,
     "failed": 0,
-    "blocked": ["hands-on checks pending", "dual-monitor checks: no second active display", "GitHub Actions: no repository", "clean-system run: no Sandbox or VM"]
+    "blocked": ["dual-monitor checks 4, 13, 14: no second display connected", "GitHub Actions: result not yet confirmed", "clean-system run: not yet done on the laptop"]
   },
   "uiBenchmark": {"cpu": "AMD Ryzen 7 7700X", "gpu": "AMD Radeon RX 6600 XT", "monitors": 1, "idleCpuPctOfOneCore": 0.365, "idleUiFps": 9.97, "idleWorkingSetMiB": 43.3},
   "audioBenchmark": {"device": null, "sampleRate": null, "frames": null, "p99CallbackLoadPct": null, "xruns": null, "workingSetMiB": null, "nullReason": "Phase 00 has no audio engine"}

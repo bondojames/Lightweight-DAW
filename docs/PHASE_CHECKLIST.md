@@ -2,7 +2,7 @@
 
 | Phase | Name | Status |
 |---|---|---|
-| 00 | Build infrastructure and native ImGui shell | IMPLEMENTED_UNVERIFIED |
+| 00 | Build infrastructure and native ImGui shell | BLOCKED (dual-monitor checks) |
 | 01 | Audio callback, test tone, metronome, diagnostics | PLANNED |
 | 02 | Audio track arrangement, import, playback | PLANNED |
 | 03 | Browser, project save/load, undo, recovery | PLANNED |
@@ -21,13 +21,13 @@
 
 | # | Requirement | State |
 |---|---|---|
-| 1 | Deliverables implemented and mapped to tests | Done, except hands-on rows |
+| 1 | Deliverables implemented and mapped to tests | Done |
 | 2 | Clean build from a fresh checkout with pinned deps | Done |
 | 3 | Release EXE executed, zipped, SHA-256 recorded | Done |
-| 4 | Automated tests pass; manual tests performed | Automated done; manual PENDING |
+| 4 | Automated tests pass; manual tests performed | Automated done; 14 of 17 manual passed, 3 BLOCKED |
 | 5 | Performance recorded on named hardware | Done on Tier 1 (ADR-005) |
-| 6 | No critical data loss, crashes or regressions | None known; pending hands-on |
-| 7 | Notices and licensing verified | Dear ImGui done; OPEN-001 awaits owner |
+| 6 | No critical data loss, crashes or regressions | None known |
+| 7 | Notices and licensing verified | Done (ADR-014) |
 | 8 | Prior project files load | Not applicable, no project format yet |
 | 9 | Docs current | Done |
-| 10 | User performs the named use case from the package | PENDING |
+| 10 | User performs the named use case from the package | Done, except moving panels to a second monitor |

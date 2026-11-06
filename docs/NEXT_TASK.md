@@ -3,7 +3,7 @@ Phase / issue: finish Phase 00 acceptance, then Phase 01 (real audio callback, t
 
 User-visible outcome: press Play and hear a timing-accurate metronome or test tone through a chosen Windows audio device.
 
-Prerequisite: the owner completes `tests/manual/phase-00.md`. Tag `phase-00-accepted` only with that evidence, or with an owner decision recorded in `docs/DECISIONS.md` about any blocked checks.
+Prerequisite: Phase 00 checks 4, 13 and 14 need a second display. Tag `phase-00-accepted` only after those pass; never tag it without them. Whether to start Phase 01 first is an owner decision.
 
 Scope (maximum 3 bounded deliverables):
 1. `WasapiBackend` implementing `IAudioBackend`: device enumeration, shared-mode event-driven float32 stereo output, format negotiation, safe stop, restart and device change.

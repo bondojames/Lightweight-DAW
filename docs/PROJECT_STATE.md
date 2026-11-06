@@ -1,9 +1,9 @@
 # Project State
 Spec: v2.0, with changes in `docs/DECISIONS.md` | Current branch: main | HEAD: see `git log`
 Accepted phase: none (no tag yet)
-Active phase/task: Phase 00 | Status: IMPLEMENTED_UNVERIFIED, awaiting hands-on checks
+Active phase/task: Phase 00 | Status: BLOCKED on dual-monitor checks; owner passed the other 14 hands-on checks
 Toolchain/deps: MSVC 14.44 (VS 2022 Build Tools), CMake 4.4.4, Ninja, Windows SDK 10.0.26100; Dear ImGui v1.93.0-docking at b916186e; no audio SDKs yet
-Verified builds: `builds/phase-00/LightweightDAW.exe`, built from 11efa22; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
+Verified builds: `builds/phase-00/LightweightDAW.exe`, built from 4de4dce; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
 
 Implemented today (verified by automated tests or a real run):
 - Win32 window, message loop, per-monitor DPI v2 manifest, D3D11 hardware device, flip-model swap chain, resize and minimize.
@@ -13,7 +13,7 @@ Implemented today (verified by automated tests or a real run):
 - Native Open and Save dialogs, main-window file drop, settings, logging, local crash dumps, simulated GPU reset recovery.
 - Interfaces only, with no implementation: `IAudioBackend`, `IAudioProcessor`, `IMidiBackend`, `IPluginHostAdapter`.
 
-Written but not yet proven by a person or on target hardware: real mouse docking, second monitor, real DPI changes, dialogs and drops by hand. Checklist: `tests/manual/phase-00.md`.
+Owner-verified by hand on the single-monitor PC: docking, detaching, dialogs, file drop, DPI 100% and 150%, themes, keyboard, idle. Not proven: anything needing a second display. Checklist: `tests/manual/phase-00.md`.
 
 Key invariants:
 - `core`, `engine`, `plugins` link no ImGui, D3D or window code; CMake targets enforce this, and the test binary proves it.
@@ -28,9 +28,9 @@ Package command: `tools\package.cmd 00`
 Benchmark: `tools\profile.ps1`. Ryzen 7 7700X, RX 6600 XT, 1 display: idle 0.37% of one core, 10 UI frames/s, 43 MiB. No audio yet, so callback load and xruns do not apply.
 
 Blocking issues:
-- Hands-on checks pending; a second display must be active for rows 4, 13, 14.
-- GitHub repo does not exist, so CI has never run.
-- OPEN-001 plug-in license exception and OPEN-002 ASIO test driver await owner decisions.
+- Rows 4, 13, 14 need a second display. The laptop plus any monitor or TV could provide it.
+- CI result on GitHub not yet confirmed. Repo: bondojames/Lightweight-DAW (private).
+- OPEN-002: ASIO test driver and audio interface await the owner.
 
-Decisions changed since last handoff: ADR-001 to ADR-013 are new (first handoff).
+Decisions changed since last handoff: ADR-001 to ADR-014 are new (first handoff).
 Next file: docs/NEXT_TASK.md

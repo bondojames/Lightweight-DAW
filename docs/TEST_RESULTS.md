@@ -6,7 +6,7 @@ Machine: Ryzen 7 7700X (16 logical cores), 31 GB RAM, AMD Radeon RX 6600 XT, one
 
 | Check | Result |
 |---|---|
-| Release build from a fresh `git clone` of f632734 | PASS |
+| Release build from a fresh `git clone` of 4e1c89d | PASS |
 | CTest `unit`: 28 headless cases, no ImGui or D3D linked | PASS |
 | CTest `app_smoke_warp`: real window on software rendering | PASS |
 | CTest `app_ui_self_test`: 11 scripted steps on real ImGui state | PASS |
@@ -34,20 +34,28 @@ The self-test drives ImGui directly. It does not prove real mouse dragging, phys
 Against spec targets: at most 3% of total-system CPU and 450 MiB when idle: both met by a wide margin, on this machine. Not low-end evidence (ADR-005).
 
 Notes on these numbers:
-- Idle, active and detached ran on commit f632734. Minimized ran on the next commit, which only adds logging and this validity check.
+- Idle, active and detached ran on commit 4e1c89d. Minimized ran on the next commit, which only adds logging and this validity check.
 - GPU time itself is not measured yet, only CPU time spent on rendering calls.
-- **One minimized run was discarded.** A first full run at f632734 drew 666 frames, at 11.1 frames/s, because the window was not minimized during it. That build had no logging to show what restored it. A click on the window is the likely cause, but this is unproven. The rerun logged a single minimize at 0.05 s and drew 0 frames over the full 120 seconds. The run now fails if the window was restored.
+- **One minimized run was discarded.** A first full run at 4e1c89d drew 666 frames, at 11.1 frames/s, because the window was not minimized during it. That build had no logging to show what restored it. A click on the window is the likely cause, but this is unproven. The rerun logged a single minimize at 0.05 s and drew 0 frames over the full 120 seconds. The run now fails if the window was restored.
 - Earlier numbers, before the timer fix, are also discarded: active reached only 49 frames/s, due to the 15.6 ms system tick.
 
 ## Phase 00, hands-on
 
-Not yet done. Checklist: `tests/manual/phase-00.md`. Status of every row: PENDING. Rows 4, 13 and 14 are BLOCKED until a second display is active.
+Performed by the owner on 2026-11-06 on the single-monitor PC, using the previous package. That build has the same code, before the license wording was added to About and the ZIP. Results are as the owner reported them.
+
+| Checks in `tests/manual/phase-00.md` | Result |
+|---|---|
+| 1-3, 5, 7-12, 15-17 | PASS |
+| 6: detach a panel, close and reopen the app | PASS. The owner reported the panel was still detached after restart, which is the intended behavior |
+| 4, 13, 14: need a second display | BLOCKED, none connected |
+
+The current package differs from the tested one only as above. It passed the automated tests and the extracted-ZIP run, and was built from a fresh clone at 4de4dce.
 
 ## Not run
 
 | Check | Why |
 |---|---|
-| GitHub Actions workflow | No repository yet; the workflow has never executed |
-| Clean-system run | Windows Sandbox not installed; no VM |
+| GitHub Actions workflow | Result not yet confirmed; see the repo's Actions tab |
+| Clean-system run | Not yet run on the laptop |
 | Windows 10 | Out of scope (ADR-004) |
 | Real driver failure | Only a simulated device reset (KI-005) |

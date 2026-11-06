@@ -16,9 +16,9 @@
 
 | Item | Needs |
 |---|---|
-| Dual-monitor checks (manual 4, 13, 14) | Windows currently reports one active display: 1920x1080. A second one must be connected and enabled |
-| Clean-system run | Windows Sandbox or a VM. Sandbox is not installed, and enabling it is a Windows feature the owner must turn on. The ZIP has been run from a fresh extract with no developer PATH on this PC, which is weaker evidence |
-| Windows CI result | A private GitHub repo and an approved first push |
+| Dual-monitor checks (manual 4, 13, 14) | A second display. None is connected to the PC. The laptop plus a monitor or TV would work, and would also test mixed scaling |
+| Clean-system run | Run the ZIP on the laptop, which has no developer tools, or use Windows Sandbox or a VM. The ZIP has run from a fresh extract with no developer PATH on this PC, which is weaker evidence |
+| Windows CI result | Confirm the first run in the repo's Actions tab |
 
 ## Hardware for later phases
 
