@@ -120,6 +120,8 @@ void drawTrackHeader(TimelineState& state, ProjectHistory& history, const Track&
             const float gain = dbToAmplitude(db);
             history.applyGrouped("Track gain", [&](Project& p) { return commands::setTrackGain(p, track.id, gain); });
         }
+        state.geometry.gainSliderX = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
+        state.geometry.gainSliderY = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
         if (ImGui::IsItemDeactivated()) history.endGroup();
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             history.apply("Track gain", [&](Project& p) { return commands::setTrackGain(p, track.id, 1.0f); });
@@ -170,9 +172,9 @@ void drawTimelinePanel(TimelineState& state, const TimelineContext& context) {
     ImGui::SameLine();
     ImGui::Checkbox("Follow", &state.followPlayhead);
     ImGui::SetItemTooltip("Scroll to keep the playhead in view while playing.");
-    ImGui::SameLine();
     const std::size_t jobs = context.media.pendingJobs();
     if (jobs > 0) {
+        ImGui::SameLine(); // Only with something to follow it, or the timeline would start on this row.
         const std::string name = context.media.currentJobName();
         ImGui::Text("Preparing %s (%.0f%%)%s", name.c_str(), context.media.currentJobProgress() * 100.0f, jobs > 1 ? ", more waiting" : "");
     }
@@ -213,9 +215,13 @@ void drawTimelinePanel(TimelineState& state, const TimelineContext& context) {
         return project->tracks[static_cast<std::size_t>(index)].id;
     };
 
-    state.dropInside = (inCanvas || inRuler) && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-    state.dropTrack = inCanvas ? trackAtMouse() : kNoId;
-    state.dropTime = snapped(state, mouseTime, bpm);
+    state.geometry.valid = true;
+    state.geometry.canvasMinX = canvasMin.x;
+    state.geometry.canvasMinY = canvasMin.y;
+    state.geometry.canvasMaxX = canvasMax.x;
+    state.geometry.canvasMaxY = canvasMax.y;
+    state.geometry.rulerMinY = origin.y;
+    state.geometry.trackHeight = trackHeight;
 
     // --- Background and clipping
     draw->PushClipRect(canvasMin, canvasMax, true);
@@ -317,7 +323,9 @@ void drawTimelinePanel(TimelineState& state, const TimelineContext& context) {
     draw->PopClipRect();
 
     // --- Track headers (real widgets, so they handle their own input)
-    draw->PushClipRect(ImVec2(origin.x, canvasMin.y), ImVec2(canvasMin.x, canvasMax.y), true);
+    // Use only ImGui's own push and pop here. ImGui::PopClipRect restores the window's input
+    // clip from the draw list's stack, so an extra draw-list push would leave that clip stuck
+    // on this small area, and everything after it would stop receiving input.
     ImGui::PushClipRect(ImVec2(origin.x, canvasMin.y), ImVec2(canvasMin.x, canvasMax.y), true);
     for (std::size_t i = 0; i < project->tracks.size(); ++i) {
         const float top = canvasMin.y + trackHeight * static_cast<float>(i) - state.scrollY;
@@ -326,7 +334,6 @@ void drawTimelinePanel(TimelineState& state, const TimelineContext& context) {
         draw->AddLine(ImVec2(origin.x, top + trackHeight - 1.0f), ImVec2(canvasMin.x, top + trackHeight - 1.0f), ImGui::GetColorU32(ImGuiCol_Border));
     }
     ImGui::PopClipRect();
-    draw->PopClipRect();
 
     // --- Canvas input
     ImGui::SetCursorScreenPos(rulerMin);
@@ -489,6 +496,22 @@ void drawTimelinePanel(TimelineState& state, const TimelineContext& context) {
     // A clip the user selected may have been removed by undo.
     if (state.selectedClip != kNoId && !history.current()->findClip(state.selectedClip)) state.selectedClip = kNoId;
     if (state.selectedTrack != kNoId && !history.current()->findTrack(state.selectedTrack)) state.selectedTrack = kNoId;
+}
+
+DropTarget timelineDropTarget(const TimelineState& state, const Project& project, double bpm, int screenX, int screenY) {
+    DropTarget target;
+    const TimelineState::Geometry& g = state.geometry;
+    const auto x = static_cast<float>(screenX);
+    const auto y = static_cast<float>(screenY);
+    if (!g.valid || x < g.canvasMinX || x >= g.canvasMaxX || y < g.rulerMinY || y >= g.canvasMaxY) return target;
+    target.insideTimeline = true;
+    const Time time = state.view.pixelToTime(x - g.canvasMinX);
+    target.time = state.snap ? snapToBeat(time, bpm) : time;
+    if (y >= g.canvasMinY) {
+        const int index = static_cast<int>((y - g.canvasMinY + state.scrollY) / g.trackHeight);
+        if (index >= 0 && index < static_cast<int>(project.tracks.size())) target.trackId = project.tracks[static_cast<std::size_t>(index)].id;
+    }
+    return target;
 }
 
 void drawInspectorPanel(TimelineState& state, const TimelineContext& context) {

@@ -83,6 +83,7 @@ bool ImGuiHost::resumeBackends(ID3D11Device* device, ID3D11DeviceContext* contex
 void ImGuiHost::beginFrame() {
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
+    if (injector_) injector_();
     ImGui::NewFrame();
 }
 

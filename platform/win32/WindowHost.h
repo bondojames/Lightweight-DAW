@@ -43,6 +43,9 @@ public:
     bool takePendingResize(unsigned& width, unsigned& height);
     bool takeDisplayChanged();
     std::vector<std::filesystem::path> takeDroppedFiles();
+    // Where the last drop landed, in screen pixels.
+    int lastDropX() const { return dropX_; }
+    int lastDropY() const { return dropY_; }
 
     bool isMinimized() const;
     bool isMaximized() const;
@@ -63,6 +66,8 @@ private:
     unsigned pendingWidth_ = 0;
     unsigned pendingHeight_ = 0;
     bool displayChanged_ = false;
+    int dropX_ = 0;
+    int dropY_ = 0;
     std::vector<std::filesystem::path> dropped_;
 };
 

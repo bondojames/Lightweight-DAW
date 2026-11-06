@@ -29,6 +29,19 @@ std::optional<std::filesystem::path> showOpenFileDialog(HWND owner) {
     return runDialog(dialog.Get(), owner);
 }
 
+std::optional<std::filesystem::path> showOpenAudioDialog(HWND owner) {
+    ComPtr<IFileOpenDialog> dialog;
+    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) return std::nullopt;
+    const COMDLG_FILTERSPEC types[] = {
+        {L"Audio files", L"*.wav;*.wave;*.aif;*.aiff;*.aifc;*.flac;*.mp3;*.m4a;*.aac;*.mp4"},
+        {L"All files", L"*.*"},
+    };
+    dialog->SetFileTypes(ARRAYSIZE(types), types);
+    dialog->SetTitle(L"Import audio");
+    dialog->SetOkButtonLabel(L"Import");
+    return runDialog(dialog.Get(), owner);
+}
+
 std::optional<std::filesystem::path> showSaveFileDialog(HWND owner) {
     ComPtr<IFileSaveDialog> dialog;
     if (FAILED(CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) return std::nullopt;

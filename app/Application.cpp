@@ -298,8 +298,9 @@ void Application::handleDrops() {
         uiState_.droppedFiles.insert(uiState_.droppedFiles.begin(), name);
         if (uiState_.droppedFiles.size() > kMaxDroppedFilesShown) uiState_.droppedFiles.pop_back();
         // The first file lands where it was dropped. Any others get tracks of their own, lined up with it.
-        const ui::TimelineState& timeline = uiState_.timeline;
-        requestImport(path, (first && timeline.dropInside) ? timeline.dropTrack : model::kNoId, timeline.dropInside ? timeline.dropTime : 0);
+        const double bpm = uiState_.engine.bpm > 0.0 ? uiState_.engine.bpm : 120.0;
+        const ui::DropTarget target = ui::timelineDropTarget(uiState_.timeline, *history_.current(), bpm, window_.lastDropX(), window_.lastDropY());
+        requestImport(path, first ? target.trackId : model::kNoId, target.time);
         first = false;
     }
 }
@@ -385,8 +386,14 @@ void Application::runPendingDialog() {
     pendingDialog_ = ui::DialogRequest::None;
     if (request == ui::DialogRequest::None) return;
 
-    const auto result = request == ui::DialogRequest::Open ? platform::showOpenFileDialog(window_.hwnd())
-                                                           : platform::showSaveFileDialog(window_.hwnd());
+    const auto chooseFile = [&] {
+        switch (request) {
+        case ui::DialogRequest::Open: return platform::showOpenFileDialog(window_.hwnd());
+        case ui::DialogRequest::ImportAudio: return platform::showOpenAudioDialog(window_.hwnd());
+        default: return platform::showSaveFileDialog(window_.hwnd());
+        }
+    };
+    const auto result = chooseFile();
     if (request == ui::DialogRequest::ImportAudio) {
         if (result) {
             const double rate = uiState_.engine.sampleRate > 0.0 ? uiState_.engine.sampleRate : 48000.0;

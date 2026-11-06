@@ -15,6 +15,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -118,6 +119,32 @@ private:
         std::function<bool()> check;
         std::uint64_t settleFrames = 12;
     };
+    struct TestInput {
+        float x = -1.0f, y = -1.0f;
+        int button = -1;
+        bool down = false;
+        float wheel = 0.0f;
+        int keyMod = 0;
+        bool keyDown = false;
+    };
+    void injectTestInput();
+    void sendMove(float x, float y);
+    void sendClick(float x, float y);
+    void sendDrag(float x0, float y0, float x1, float y1, bool shift = false);
+    void sendWheel(float x, float y, float amount, bool ctrl);
+    const model::Clip* testClip() const;
+    float testClipX(float fraction) const;
+    float testClipEndX() const;
+    float testLaneY(int lane) const;
+    std::deque<TestInput> testInput_;
+    TestInput testLastInput_;
+    mutable model::Clip testClipCopy_;
+    model::Time testLength_ = 0;
+    double testZoom_ = 0.0;
+    double testScroll_ = 0.0;
+    std::int64_t testSeekFrames_ = 0;
+    float testGain_ = 0.0f;
+    std::uint64_t testRevision_ = 0;
     std::vector<SelfTestStep> selfTestSteps_;
     std::size_t selfTestIndex_ = 0;
     std::uint64_t selfTestCheckAtFrame_ = 0;

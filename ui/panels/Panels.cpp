@@ -400,6 +400,7 @@ UiActions drawInterface(WorkspaceManager& workspaces, UiState& state) {
     workspaces.buildFactoryLayoutIfNeeded(dockspaceId, viewport->WorkSize.x, viewport->WorkSize.y);
     ImGui::DockSpaceOverViewport(dockspaceId, viewport);
 
+    state.timeline.geometry.valid = false; // Set again only if the timeline really draws this frame.
     drawPanels(workspaces, state, actions);
     workspaces.rescueWindowsIfNeeded();
     drawAbout(state);

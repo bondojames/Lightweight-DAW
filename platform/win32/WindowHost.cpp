@@ -178,6 +178,11 @@ long long WindowHost::handleMessage(unsigned message, unsigned long long wParam,
         break;
     case WM_DROPFILES: {
         const HDROP drop = reinterpret_cast<HDROP>(wParam);
+        POINT point{};
+        DragQueryPoint(drop, &point);
+        ClientToScreen(hwnd_, &point);
+        dropX_ = point.x;
+        dropY_ = point.y;
         auto files = droppedFiles(drop);
         DragFinish(drop);
         dropped_.insert(dropped_.end(), files.begin(), files.end());

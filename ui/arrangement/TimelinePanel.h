@@ -31,11 +31,25 @@ struct TimelineState {
     model::Time dragPreviewEnd = 0;
     model::Id dragPreviewTrack = model::kNoId;
 
-    // Filled in while drawing, for a file dropped on the window this frame.
-    model::Id dropTrack = model::kNoId;
-    model::Time dropTime = 0;
-    bool dropInside = false;
+    // Where things were last drawn, in screen pixels. Used to place dropped files, since
+    // Windows sends no mouse moves during a file drag, and by the UI self-test.
+    struct Geometry {
+        bool valid = false;
+        float canvasMinX = 0.0f, canvasMinY = 0.0f, canvasMaxX = 0.0f, canvasMaxY = 0.0f;
+        float rulerMinY = 0.0f;
+        float trackHeight = 1.0f;
+        float gainSliderX = 0.0f, gainSliderY = 0.0f; // Centre of the first track's gain slider.
+    };
+    Geometry geometry;
 };
+
+// Where a file dropped at this screen point should land.
+struct DropTarget {
+    bool insideTimeline = false;
+    model::Id trackId = model::kNoId; // kNoId means a new track.
+    model::Time time = 0;
+};
+DropTarget timelineDropTarget(const TimelineState& state, const model::Project& project, double bpm, int screenX, int screenY);
 
 struct TimelineContext {
     commands::ProjectHistory& history;
