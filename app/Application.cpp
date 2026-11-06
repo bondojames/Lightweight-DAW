@@ -432,7 +432,8 @@ bool Application::finishProfile() {
         "  \"processCpuPctOfOneCore\": {:.3f},\n  \"processCpuPctOfSystem\": {:.3f},\n  \"uiThreadCpuPctOfOneCore\": {:.3f},\n"
         "  \"avgBuildMs\": {:.3f},\n  \"avgRenderMs\": {:.3f},\n  \"avgPresentMsIncludingVsyncWait\": {:.3f},\n"
         "  \"maxDrawCalls\": {},\n  \"maxViewports\": {},\n  \"workingSetMiB\": {:.1f},\n  \"maxWorkingSetMiB\": {:.1f},\n"
-        "  \"privateMiB\": {:.1f},\n  \"mainWindowMinimized\": {}\n}}\n",
+        "  \"privateMiB\": {:.1f},\n  \"mainWindowMinimized\": {},\n  \"audioStatus\": \"{}\",\n  \"audioDevice\": \"{}\",\n  \"audioSampleRate\": {:.0f},\n"
+        "  \"audioPeriodFrames\": {},\n  \"audioP99LoadPct\": {:.1f},\n  \"audioPeakLoadPct\": {:.2f},\n  \"xrunsEngine\": {},\n  \"xrunsDevice\": {}\n}}\n",
         profileModeName(args_.profile), args_.settleSeconds, elapsed, device_.adapterName(), device_.isWarp() ? "true" : "false",
         platform::WindowHost::monitorWorkAreas().size(), sample.logicalCores, frames, static_cast<double>(frames) / elapsed,
         sample.processCpuOfOneCore, sample.processCpuOfSystem, sample.uiThreadCpuOfOneCore, profileBuildMs_ / divisor,

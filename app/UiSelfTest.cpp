@@ -34,7 +34,16 @@ bool isFloatingInOwnWindow(ui::PanelId id) {
     return window && !window->DockIsActive && window->Viewport && window->Viewport != ImGui::GetMainViewport();
 }
 
-int viewportCount() { return ImGui::GetPlatformIO().Viewports.Size; }
+// Panel windows only. A tooltip under the user's resting mouse is also an OS window,
+// and must not change the result.
+int viewportCount() {
+    int count = 0;
+    for (ImGuiViewport* viewport : ImGui::GetPlatformIO().Viewports) {
+        const ImGuiWindow* window = static_cast<ImGuiViewportP*>(viewport)->Window;
+        if (!window || !(window->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup))) ++count;
+    }
+    return count;
+}
 
 } // namespace
 
@@ -163,6 +172,17 @@ void Application::stepSelfTest(double time) {
 
     const bool passed = step.check();
     if (!passed) ++selfTestFailures_;
+    if (!passed) {
+        // Enough state to diagnose a failure from the log alone.
+        for (const ImGuiViewport* viewport : ImGui::GetPlatformIO().Viewports) {
+            log::info(std::format("  viewport pos {:.0f},{:.0f} size {:.0f}x{:.0f} flags 0x{:X}", viewport->Pos.x, viewport->Pos.y, viewport->Size.x, viewport->Size.y, static_cast<int>(viewport->Flags)));
+        }
+        for (const ui::PanelDef& def : ui::panelDefs()) {
+            if (const ImGuiWindow* window = ImGui::FindWindowByName(def.windowName)) {
+                log::info(std::format("  {} open={} docked={} pos {:.0f},{:.0f}", def.stableId, workspaces_.panelOpen(def.id), window->DockIsActive, window->Pos.x, window->Pos.y));
+            }
+        }
+    }
     log::info(std::format("UI self-test [{}] {}", passed ? "PASS" : "FAIL", step.name));
     ++selfTestIndex_;
     selfTestActed_ = false;
