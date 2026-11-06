@@ -1,5 +1,5 @@
 # Continuation Handoff
-Commit: 174b237 is the built code; later commits are docs only | Accepted tag: none | Working tree clean? Yes when this was committed
+Commit: 174b237 is the built code; later commits are docs only | Accepted tag: phase-01-accepted | Working tree clean? Yes when this was committed
 
 This session completed (verified): Phase 01 code, automated tests, soak, profile and packaging. Details in `docs/TEST_RESULTS.md`.
 
@@ -14,11 +14,11 @@ Commands actually executed + results:
 - `tools\package.cmd 01`: pass, including a run from the extracted ZIP.
 - `LightweightDAW_audiotest`: runs on all 4 outputs, 10 restarts, loopback timing, 5 of 5 injected overruns detected, 30-minute and 4-core soaks.
 
-Runtime/manual verification actually done: the owner heard the metronome and test tone. Other checks in `tests/manual/phase-01.md` are pending.
+Runtime/manual verification actually done: the owner reported all 12 listening checks passing.
 
 CPU/audio load/xruns/RAM baseline delta: first audio baseline; see TEST_RESULTS. Idle UI rose from 0.365% to 0.729% of one core with the audio stream open.
 
-Known failures, hardware missing, and precise repro: no known test failures. Second display, ASIO, audio interface and laptop data are outstanding. The soak ran on the HD Audio output, not the owner's default Hesh Evo headphones. GitHub Actions has not yet run this code.
+Known failures, hardware missing, and precise repro: no known test failures. Second display, ASIO, audio interface and laptop data are outstanding. The soak ran on the HD Audio output, not the owner's default Hesh Evo headphones. GitHub Actions passed on 9b20cce.
 
 Changes to interfaces/schema/ADR: `IAudioBackend` changed (`enumerateOutputs`, `streamInfo`, telemetry passed to `start`). ADR-015 to ADR-017.
 

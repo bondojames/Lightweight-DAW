@@ -1,7 +1,7 @@
 # Project State
 Spec: v2.0, with changes in `docs/DECISIONS.md` | Current branch: main | HEAD: see `git log`
-Accepted phase: none (no tags yet)
-Active phase/task: Phase 01 | Status: IMPLEMENTED_UNVERIFIED, awaiting listening checks. Phase 00 stays BLOCKED on dual-monitor checks only.
+Accepted phase: 01 (tag phase-01-accepted). Phase 00 is BLOCKED only on its three dual-monitor checks.
+Active phase/task: Phase 02 | Status: IN_PROGRESS
 Toolchain/deps: MSVC 14.44 (VS 2022 Build Tools), CMake 4.4.4, Ninja, Windows SDK 10.0.26100; Dear ImGui v1.93.0-docking at b916186e; WASAPI from Windows, no audio SDKs
 Verified builds: `builds/phase-01/`, built from 174b237; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
 Repository: https://github.com/bondojames/Lightweight-DAW (public)
@@ -15,7 +15,7 @@ Implemented today (verified by automated tests or a real run):
 - UI: transport, Space bar, metronome, tone, BPM, device, rate and buffer settings, audio diagnostics, offline metronome test.
 - `LightweightDAW_audiotest.exe`: headless device tests, including timing through Windows loopback.
 
-Owner has confirmed by ear: the metronome and test tone work. The other listening checks are pending: `tests/manual/phase-01.md`.
+Owner confirmed all 12 Phase 01 listening checks: `tests/manual/phase-01.md`.
 
 Key invariants:
 - `core`, `engine`, `plugins` link no ImGui, D3D or window code; CMake targets enforce this.
@@ -32,7 +32,6 @@ Benchmark: `tools\profile.ps1` and `LightweightDAW_audiotest run`. 7700X, 48 kHz
 
 Blocking issues:
 - Phase 00 checks 4, 13, 14 need a second display.
-- Phase 01 listening checks pending.
 - Laptop results not yet recorded (ADR-005 Tier 3).
 - OPEN-002: ASIO driver and audio interface.
 

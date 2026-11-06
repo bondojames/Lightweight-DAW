@@ -3,7 +3,7 @@
 | Phase | Name | Status |
 |---|---|---|
 | 00 | Build infrastructure and native ImGui shell | BLOCKED (dual-monitor checks) |
-| 01 | Audio callback, test tone, metronome, diagnostics | IMPLEMENTED_UNVERIFIED (listening checks) |
+| 01 | Audio callback, test tone, metronome, diagnostics | ACCEPTED (tag phase-01-accepted) |
 | 02 | Audio track arrangement, import, playback | PLANNED |
 | 03 | Browser, project save/load, undo, recovery | PLANNED |
 | 04 | Audio capture and physical input | PLANNED |

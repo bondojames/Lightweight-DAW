@@ -1,5 +1,5 @@
 # Next Engineering Task
-Phase / issue: Phase 02 (audio track arrangement, import and playback), once the owner finishes `tests/manual/phase-01.md`.
+Phase / issue: Phase 02 (audio track arrangement, import and playback).
 
 User-visible outcome: drop an audio file onto a track, move and trim it, play it from any point, and loop a region.
 

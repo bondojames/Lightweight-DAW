@@ -122,7 +122,11 @@ The app logs every dropout, and these runs logged none. That build did not write
 
 ## Phase 01, hands-on
 
-Checklist: `tests/manual/phase-01.md`. The owner confirmed by ear that the metronome and test tone work (checks 1 and 5, in part). All other rows: PENDING.
+Checklist: `tests/manual/phase-01.md`. Performed by the owner on 2026-11-06, and all 12 reported as passing. Results are as the owner reported them.
+
+## Phase 01, GitHub Actions
+
+Run on commit 9b20cce: success, on a runner with no GPU.
 
 ## Not run
 
