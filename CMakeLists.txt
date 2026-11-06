@@ -46,8 +46,10 @@ add_library(ldaw_engine STATIC
   engine/render/OfflineRender.cpp
   engine/device/WasapiBackend.cpp
   engine/device/AudioService.cpp
+  engine/media/AudioDecoder.cpp
+  engine/media/MediaImport.cpp
 )
-target_link_libraries(ldaw_engine PUBLIC ldaw_warnings PRIVATE avrt ole32 uuid)
+target_link_libraries(ldaw_engine PUBLIC ldaw_warnings PRIVATE avrt ole32 uuid mfuuid ldaw_sndfile_dll samplerate)
 
 # Real-device test tool. Links no ImGui or Direct3D.
 add_executable(LightweightDAW_audiotest tools/audiotest/main.cpp)
@@ -62,11 +64,12 @@ target_link_libraries(ldaw_plugins_api INTERFACE ldaw_warnings)
 add_library(ldaw_ui_logic STATIC ui/FrameScheduler.cpp)
 target_link_libraries(ldaw_ui_logic PUBLIC ldaw_warnings)
 
+include(cmake/Dependencies.cmake)
+
 add_subdirectory(tests)
 
 option(LDAW_BUILD_APP "Build the GUI application" ON)
 if(LDAW_BUILD_APP)
-  include(cmake/Dependencies.cmake)
 
   add_library(ldaw_platform STATIC
     platform/win32/WindowHost.cpp
