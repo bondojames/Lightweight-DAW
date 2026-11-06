@@ -51,11 +51,84 @@ Performed by the owner on 2026-11-06 on the single-monitor PC, using the previou
 
 The current package differs from the tested one only as above. It passed the automated tests and the extracted-ZIP run, and was built from a fresh clone at 4de4dce.
 
+## Phase 00, GitHub Actions
+
+Run 42243642981 on commit c2f9e1b: success, with software rendering and no GPU.
+
+## Phase 01, automated, run 2026-11-06
+
+| Check | Result |
+|---|---|
+| Release build from a fresh clone of 174b237 | PASS |
+| CTest `unit`: 75 cases | PASS |
+| CTest `app_ui_self_test`: 16 steps; the audio clock keeps moving through a GPU reset, workspace switches and window changes | PASS |
+| Whole CTest suite repeated 5 more times | PASS each time |
+| Extracted ZIP runs with no developer PATH; DLLs are Windows system DLLs only | PASS |
+| Offline beat spacing at 44.1, 48 and 96 kHz | PASS, mean within 0.1 frame |
+| Tempo math after 2 hours at 96 kHz | PASS, exact |
+| Output identical for any block size | PASS |
+| No heap allocation in engine processing, plus a test that the counter works | PASS |
+| No device, device lost and returned, missing saved device, failed open, default change (scripted backend) | PASS |
+
+### Real devices (silent, gain 0, 3 seconds per setting)
+
+| Output | Rate | Asked 128 / 256 / 512, got | Dropouts | Largest peak load |
+|---|---|---|---|---|
+| Headphones (Hesh Evo) | 44100 | 441 / 441 / 441 | 0 | 0.21% |
+| Speakers (Thronmax MDrill Zero) | 48000 | 480 / 480 / 480 | 0 | 0.18% |
+| MSI G27C4 monitor | 48000 | 480 / 480 / 480 | 0 | 0.44% |
+| Speakers (High Definition Audio Device) | 48000 | 128 / 256 / 480 | 0 | 0.36% |
+
+| Check | Result |
+|---|---|
+| 10 stop and restart cycles, each producing callbacks | PASS |
+| 5 injected 40 ms stalls, one per second | 5 of 5 detected, all blamed on the engine |
+| Rate requests 44100 and 96000 on the default device | Ran with 0 dropouts; 96000 used Windows resampling |
+
+### Timing through Windows loopback (faint output, gain 0.1, 10 s, High Definition Audio Device)
+
+| Stream | Clicks | Measured spacing, expected 24000 | Largest error | Capture gaps |
+|---|---|---|---|---|
+| 48 kHz, 128 frames | 20 | 24000.000 | 0.00 frames | 0 |
+| 48 kHz, 256 frames | 20 | 24000.000 | 0.00 frames | 0 |
+| 44.1 kHz via Windows resampling, measured at 48 kHz | 20 | 24000.053 | 1.00 frame | 0 |
+
+### Soak (commit 7867e8f, metronome running, silent output, desktop in normal use)
+
+| Run | Length | Stream | Callbacks | p50 / p95 / p99 load | Peak | Dropouts | Callback allocations |
+|---|---|---|---|---|---|---|---|
+| Tier 1 | 30 min | 48 kHz, 256 frames | 337,480 | at most 0.5% each | 2.71% | 0 | 0 |
+| Tier 2 proxy, 4 logical cores (affinity 0x55, confirmed separately) | 10 min | 48 kHz, 256 frames | 112,500 | at most 0.5% each | 0.89% | 0 | 0 |
+
+The later commit 174b237 changes only profile output and the self-test.
+
+Limits of this evidence:
+- The soak has no window open and only a metronome to process. It proves the device path and a lower bound on engine cost, not a real session.
+- The 4-core limit is only a proxy: the same fast cores and full RAM.
+- Zero dropouts is what the detector reports; ADR-017 covers what it cannot see.
+- No automated test covers blocking calls in the callback. That rests on code review.
+
+### UI cost with audio open (commit 7867e8f, 60-second settle, 60-second window, default device Hesh Evo at 44.1 kHz)
+
+| Mode | UI frames/s | Process CPU, % of one core | % of whole system | Max working set |
+|---|---|---|---|---|
+| Idle | 9.98 | 0.729 | 0.046 | 45.4 MiB |
+| Active (forced) | 58.85 | 1.849 | 0.116 | 45.7 MiB |
+| Minimized | 0.00 | 0.104 | 0.007 | 38.7 MiB |
+| One detached window | 13.22 | 1.120 | 0.070 | 45.6 MiB |
+| Playing metronome (silent) | 29.70 | 1.276 | 0.080 | 45.4 MiB |
+
+The app logs every dropout, and these runs logged none. That build did not write audio numbers to its JSON. A 13-second recheck after the fix reports running, p99 at most 0.5%, and 0 dropouts.
+
+## Phase 01, hands-on
+
+Checklist: `tests/manual/phase-01.md`. The owner confirmed by ear that the metronome and test tone work (checks 1 and 5, in part). All other rows: PENDING.
+
 ## Not run
 
 | Check | Why |
 |---|---|
-| GitHub Actions workflow | Result not yet confirmed; see the repo's Actions tab |
 | Clean-system run | Not yet run on the laptop |
 | Windows 10 | Out of scope (ADR-004) |
 | Real driver failure | Only a simulated device reset (KI-005) |
+| Real device unplug | Scripted backend only; listening check 10 covers it |

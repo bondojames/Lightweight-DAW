@@ -1,36 +1,40 @@
 # Project State
 Spec: v2.0, with changes in `docs/DECISIONS.md` | Current branch: main | HEAD: see `git log`
-Accepted phase: none (no tag yet)
-Active phase/task: Phase 00 | Status: BLOCKED on dual-monitor checks; owner passed the other 14 hands-on checks
-Toolchain/deps: MSVC 14.44 (VS 2022 Build Tools), CMake 4.4.4, Ninja, Windows SDK 10.0.26100; Dear ImGui v1.93.0-docking at b916186e; no audio SDKs yet
-Verified builds: `builds/phase-00/LightweightDAW.exe`, built from 4de4dce; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
+Accepted phase: none (no tags yet)
+Active phase/task: Phase 01 | Status: IMPLEMENTED_UNVERIFIED, awaiting listening checks. Phase 00 stays BLOCKED on dual-monitor checks only.
+Toolchain/deps: MSVC 14.44 (VS 2022 Build Tools), CMake 4.4.4, Ninja, Windows SDK 10.0.26100; Dear ImGui v1.93.0-docking at b916186e; WASAPI from Windows, no audio SDKs
+Verified builds: `builds/phase-01/`, built from 174b237; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
+Repository: https://github.com/bondojames/Lightweight-DAW (public)
 
 Implemented today (verified by automated tests or a real run):
-- Win32 window, message loop, per-monitor DPI v2 manifest, D3D11 hardware device, flip-model swap chain, resize and minimize.
-- One ImGui context, docking and multi-viewports, Production and Live workspaces, Reset Workspace, saved layouts, corrupt-layout fallback, stranded-panel rescue.
-- Frame scheduler using a high-resolution waitable timer: about 10 Hz idle, 60 Hz when active, no drawing when minimized.
-- Real CPU, memory and frame diagnostics. Audio status reads `not initialized`, and transport buttons are disabled.
-- Native Open and Save dialogs, main-window file drop, settings, logging, local crash dumps, simulated GPU reset recovery.
-- Interfaces only, with no implementation: `IAudioBackend`, `IAudioProcessor`, `IMidiBackend`, `IPluginHostAdapter`.
+- All of Phase 00 (see `docs/TEST_RESULTS.md`).
+- `AudioEngine`: 64-bit sample clock, tempo map with no accumulated drift, sample-accurate metronome with accent, 440 Hz test tone, declicked stop. Same code for live and offline.
+- `WasapiBackend`: event-driven shared mode, period negotiation via IAudioClient3, MMCSS Pro Audio priority, any device format, Windows resampling for other rates.
+- `AudioService`: device work on a control thread; no-device message, reconnect, follows the Windows default, falls back from a missing saved device.
+- Lock-free commands (UI to audio) and telemetry (audio to UI): load percentiles, dropouts by cause.
+- UI: transport, Space bar, metronome, tone, BPM, device, rate and buffer settings, audio diagnostics, offline metronome test.
+- `LightweightDAW_audiotest.exe`: headless device tests, including timing through Windows loopback.
 
-Owner-verified by hand on the single-monitor PC: docking, detaching, dialogs, file drop, DPI 100% and 150%, themes, keyboard, idle. Not proven: anything needing a second display. Checklist: `tests/manual/phase-00.md`.
+Owner has confirmed by ear: the metronome and test tone work. The other listening checks are pending: `tests/manual/phase-01.md`.
 
 Key invariants:
-- `core`, `engine`, `plugins` link no ImGui, D3D or window code; CMake targets enforce this, and the test binary proves it.
-- Future audio callback: no allocation, locks or I/O. `core/logging` must never be called from it.
-- UI and layouts are never authoritative project data. No schema exists yet.
-- Official ImGui backends stay unmodified. GPU recovery restarts both backends (ADR-010).
-- Software rendering only with `--warp`, labeled in the UI; never automatic.
+- `core`, `engine`, `plugins` link no ImGui, D3D or window code; CMake targets enforce this.
+- Audio callback: no allocation, locks or I/O. `RealtimeSection` plus counting `operator new` in the test programs proves the allocation part. `core/logging` must never be called from it.
+- Audio survives GPU resets and workspace changes; the self-test checks this.
+- UI commands go through `AudioService::post`, from the UI thread only (single producer).
+- Layouts are never authoritative project data. No project schema exists yet.
+- Official ImGui backends stay unmodified. Software rendering only with `--warp`.
 
-Build command: `tools\build.cmd release` (finds MSVC itself, fetches deps, builds, runs tests)
-Test command: `ctest --preset release` after a build, or `build\release\bin\LightweightDAW.exe --ui-self-test`
-Package command: `tools\package.cmd 00`
-Benchmark: `tools\profile.ps1`. Ryzen 7 7700X, RX 6600 XT, 1 display: idle 0.37% of one core, 10 UI frames/s, 43 MiB. No audio yet, so callback load and xruns do not apply.
+Build command: `tools\build.cmd release`
+Test command: `ctest --preset release` after a build, from an MSVC x64 environment
+Package command: `tools\package.cmd 01`
+Benchmark: `tools\profile.ps1` and `LightweightDAW_audiotest run`. 7700X, 48 kHz, 256 frames: p99 load at most 0.5%, peak 2.71%, 0 dropouts in 30 minutes. UI idle with audio open: 0.73% of one core, 45 MiB.
 
 Blocking issues:
-- Rows 4, 13, 14 need a second display. The laptop plus any monitor or TV could provide it.
-- CI result on GitHub not yet confirmed. Repo: bondojames/Lightweight-DAW (private).
-- OPEN-002: ASIO test driver and audio interface await the owner.
+- Phase 00 checks 4, 13, 14 need a second display.
+- Phase 01 listening checks pending.
+- Laptop results not yet recorded (ADR-005 Tier 3).
+- OPEN-002: ASIO driver and audio interface.
 
-Decisions changed since last handoff: ADR-001 to ADR-014 are new (first handoff).
+Decisions changed since last handoff: ADR-015 to ADR-017.
 Next file: docs/NEXT_TASK.md

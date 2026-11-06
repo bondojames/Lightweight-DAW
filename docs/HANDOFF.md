@@ -1,31 +1,32 @@
 # Continuation Handoff
-Commit: 4de4dce is the built code; later commits are docs only | Accepted tag: none | Working tree clean? Yes when this was committed
+Commit: 174b237 is the built code; later commits are docs only | Accepted tag: none | Working tree clean? Yes when this was committed
 
-This session completed (verified): Phase 00 shell, tests, packaging, license audit of Dear ImGui. Details in `docs/PROJECT_STATE.md` and `docs/TEST_RESULTS.md`.
+This session completed (verified): Phase 01 code, automated tests, soak, profile and packaging. Details in `docs/TEST_RESULTS.md`.
 
-Build artifacts: `builds/phase-00/LightweightDAW.exe`, `builds/LightweightDAW-phase-00-win64.zip`
+Build artifacts: `builds/phase-01/`, `builds/LightweightDAW-phase-01-win64.zip`
 SHA256:
-- EXE `8b436c3e86308fc719a66397af44b0b50dcb283c7f1a0ea7344a1e81ea10a61f`
-- ZIP `0ae94d7b3beda7afe9849c20e2d69121aa7ea66fa6f0a7b63135437831ee88f0`
+- EXE `cfd6bc436808c5480c0f6124f2fa4b22af43bbec92a64ce2454a80434a803550`
+- ZIP `c81e1bd503a8b0e703e0888937eacc4dc3ae6901609f4dddf2d4b5c9554b5fc5`
 
 Commands actually executed + results:
-- `tools\build.cmd release`: pass; CTest 3 of 3 (28 unit cases, smoke, 11-step UI self-test).
-- Same from a fresh clone at 4e1c89d: pass.
-- `tools\package.cmd 00`: pass, including a run from the extracted ZIP with no developer PATH.
-- `tools\profile.ps1`: results in TEST_RESULTS, one invalid run recorded there.
+- `tools\build.cmd release`: pass; CTest 3 of 3 (75 unit cases, smoke, 16-step UI self-test). Five extra repeats of the suite also passed.
+- Same from a fresh clone at 174b237: pass.
+- `tools\package.cmd 01`: pass, including a run from the extracted ZIP.
+- `LightweightDAW_audiotest`: runs on all 4 outputs, 10 restarts, loopback timing, 5 of 5 injected overruns detected, 30-minute and 4-core soaks.
 
-Runtime/manual verification actually done: the owner ran checks 1-3, 5-12 and 15-17 by hand on the single-monitor PC and reported them passing. They used the previous package (same code, before the license text was added to About and the ZIP). I inspected one screenshot. Non-ASCII data folder and crash dump tested by command line.
+Runtime/manual verification actually done: the owner heard the metronome and test tone. Other checks in `tests/manual/phase-01.md` are pending.
 
-CPU/audio load/xruns/RAM baseline delta: first baseline. Idle 0.365% of one core, active 1.094%, minimized 0, detached 0.547%; about 43 MiB. Audio metrics do not apply yet.
+CPU/audio load/xruns/RAM baseline delta: first audio baseline; see TEST_RESULTS. Idle UI rose from 0.365% to 0.729% of one core with the audio stream open.
 
-Known failures, hardware missing, and precise repro: no known test failures. Owner confirmed no second monitor is connected. Audio interface availability unconfirmed. APC Mini not detected. No ASIO driver. Windows Sandbox not installed. See `docs/KNOWN_ISSUES.md`.
+Known failures, hardware missing, and precise repro: no known test failures. Second display, ASIO, audio interface and laptop data are outstanding. The soak ran on the HD Audio output, not the owner's default Hesh Evo headphones. GitHub Actions has not yet run this code.
 
-Changes to interfaces/schema/ADR: ADR-001 to ADR-014; OPEN-002. The owner chose Windows 11 only (ADR-004), which overrides the spec.
+Changes to interfaces/schema/ADR: `IAudioBackend` changed (`enumerateOutputs`, `streamInfo`, telemetry passed to `start`). ADR-015 to ADR-017.
 
 Advice for next engineer:
-- `Start-Process` makes Windows ignore the first `ShowWindow` argument, so a second call is needed to start minimized.
+- `sed` edits of escaped C++ format strings silently failed here twice. Check with grep, or use an edit tool.
+- Self-test results can depend on the mouse: tooltips are OS windows.
+- `Start-Process` makes Windows ignore the first `ShowWindow` argument.
 - `MsgWaitForMultipleObjectsEx` timeouts round up to 15.6 ms. Use the existing waitable timer.
-- `tools/build.cmd` reads extra CMake arguments from `LDAW_CMAKE_ARGS`.
-- Long Bash heredocs can exceed the Windows command-line limit. Write files individually.
+- Long Bash scripts can exceed the Windows command-line limit. Write files individually.
 
 Next action: read NEXT_TASK.md then execute; do not skip tests.

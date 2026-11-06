@@ -35,4 +35,10 @@ The numeric goals in spec section 7 stay. CPU is always reported against both on
 
 **ADR-014: Plug-in and driver licensing permission** (2026-11-06, owner). The project is GPL-3.0-or-later with a GPLv3 section 7 additional permission in `LICENSE-EXCEPTION.md`, allowing combination at runtime with non-GPL plug-ins and audio or MIDI drivers. `LICENSE` stays the unmodified GPL text. Contributions are accepted under the same terms. The permission cannot cover third-party GPL components, so check how each one (Rubber Band, the ASIO SDK) interacts with it during that dependency's audit. Not legal advice.
 
+**ADR-015: Direct WASAPI, not RtAudio** (2026-11-06). Direct use of `IAudioClient3` gives period negotiation, MMCSS, device-change notification and exact reporting of what the driver gave, behind `IAudioBackend`. RtAudio would hide those details. ASIO will be its own backend.
+
+**ADR-016: Audio opens at launch** (2026-11-06). The stream runs from startup, so Play starts instantly and load is always visible, and the transport only changes what is rendered. It costs about 0.1% of one core when minimized. Revisit if laptop battery results suggest releasing the device when idle.
+
+**ADR-017: How dropouts are detected** (2026-11-06). WASAPI has no underrun flag for render streams, and an empty buffer at wake-up is normal in event-driven shared mode. An engine dropout is compute time over the deadline. A device dropout is a wake over 1.5 periods late with an empty buffer, unless our own overrun caused it. The engine rule is proven with injected stalls. The device rule is only unit tested, and it could miss glitches inside the Windows audio engine or driver, so listening tests remain necessary.
+
 **OPEN-002: ASIO driver for testing.** No ASIO driver is installed. Needed by Phase 04 or 12. The owner is confirming whether an audio interface is available. Options are in KNOWN_ISSUES. The spec's sign-off requires a real ASIO interface, and a wrapper driver does not satisfy that without an owner decision.

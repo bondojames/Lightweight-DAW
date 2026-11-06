@@ -1,23 +1,21 @@
 # Next Engineering Task
-Phase / issue: finish Phase 00 acceptance, then Phase 01 (real audio callback, test tone, metronome, diagnostics).
+Phase / issue: Phase 02 (audio track arrangement, import and playback), once the owner finishes `tests/manual/phase-01.md`.
 
-User-visible outcome: press Play and hear a timing-accurate metronome or test tone through a chosen Windows audio device.
-
-Prerequisite: Phase 00 checks 4, 13 and 14 need a second display. Tag `phase-00-accepted` only after those pass; never tag it without them. Whether to start Phase 01 first is an owner decision.
+User-visible outcome: drop an audio file onto a track, move and trim it, play it from any point, and loop a region.
 
 Scope (maximum 3 bounded deliverables):
-1. `WasapiBackend` implementing `IAudioBackend`: device enumeration, shared-mode event-driven float32 stereo output, format negotiation, safe stop, restart and device change.
-2. Transport sample clock, 120 BPM 4/4 metronome with accent and sine test tone behind `IAudioProcessor`, with a preallocated buffer pool and an offline render path that needs no device.
-3. Real diagnostics: callback load against the actual deadline, xrun counts by cause, negotiated rate and buffer size. Telemetry reaches the UI through a lock-free snapshot. Enable the transport buttons.
+1. `core/model` Project, Track, Clip and MediaSource; the undoable command layer (ADR-009); immutable runtime graph snapshots published to the callback with safe retirement.
+2. Media: libsndfile and libsamplerate after license audit, Media Foundation for MP3 and M4A, worker-thread prefetch, multiresolution waveform peaks.
+3. Custom ImGui timeline: clipped waveforms, zoom, selection, move, trim, split, duplicate, snap, seek, loop, gain, pan, clip-edge fades.
 
-Out of scope: audio input, ASIO, clips, projects, MIDI.
+Out of scope: save and load, browser, recording, MIDI.
 
-Files/subsystems likely affected: new `engine/device/`, `engine/transport/`, `engine/dsp/`; `ui/panels/Panels.cpp`; `app/Application.cpp`; tests.
+Files/subsystems likely affected: new `core/model`, `core/commands`, `core/assets`; `engine/graph`; `ui/arrangement`; pins in `cmake/Dependencies.cmake`.
 
-Dependencies and migration needs: start the command queue and snapshot structure described in ADR-009. Do not assume RtAudio; evaluate direct WASAPI against it and record the decision.
+Dependencies and migration needs: audit libsndfile (LGPL; must be a DLL) and libsamplerate before pinning. `package.ps1` must allow only reviewed DLLs. ADR-006 applies: no CRT objects across DLL boundaries.
 
-Acceptance tests (automated + physical where needed): spec Phase 01 list. Beat spacing correct in an offline test; no first-party callback heap allocations under an instrumented test; ten stop and restart cycles; 30-minute xrun run with baseline CPU report at Tier 1 and Tier 2 (ADR-005). A missing output device gives a clear message and offers offline test mode. The owner confirms the sound by ear. Also test that an open native file dialog causes no xrun.
+Acceptance tests (automated + physical where needed): spec Phase 02 list. Mono and stereo imports at native and resampled rates; no UI stall on a large file; no click at a faded split; measured alignment of identical files across tracks; 10-minute playlist with no callback disk I/O; source media unchanged; allocation counter still 0 in the callback.
 
-Required packaged output: `builds/phase-01/`, ZIP, SHA-256 and log.
+Required packaged output: `builds/phase-02/`, ZIP, SHA-256 and log.
 
 Failure/rollback policy: do not replace the last accepted tag or build.

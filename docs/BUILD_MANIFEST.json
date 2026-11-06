@@ -1,21 +1,21 @@
 {
-  "phase": "00",
-  "status": "BLOCKED",
-  "commit": "4de4dce59385",
+  "phase": "01",
+  "status": "IMPLEMENTED_UNVERIFIED",
+  "commit": "174b23789957",
   "toolchain": {"compiler": "MSVC", "compilerVersion": "14.44.35207", "imguiDockingVersion": "v1.93.0-docking b916186e66aa3c02b72c6ca17455516512ed8049", "graphics": "Win32+D3D11"},
   "artifact": {
-    "path": "builds/phase-00/LightweightDAW.exe",
-    "sha256": "8b436c3e86308fc719a66397af44b0b50dcb283c7f1a0ea7344a1e81ea10a61f",
-    "zipPath": "builds/LightweightDAW-phase-00-win64.zip",
-    "zipSha256": "0ae94d7b3beda7afe9849c20e2d69121aa7ea66fa6f0a7b63135437831ee88f0"
+    "path": "builds/phase-01/LightweightDAW.exe",
+    "sha256": "cfd6bc436808c5480c0f6124f2fa4b22af43bbec92a64ce2454a80434a803550",
+    "zipPath": "builds/LightweightDAW-phase-01-win64.zip",
+    "zipSha256": "c81e1bd503a8b0e703e0888937eacc4dc3ae6901609f4dddf2d4b5c9554b5fc5"
   },
   "testRun": {
     "hostOS": "Windows 11 Pro build 26200",
     "dateUTC": "2026-11-06",
     "passed": 3,
     "failed": 0,
-    "blocked": ["dual-monitor checks 4, 13, 14: no second display connected", "GitHub Actions: result not yet confirmed", "clean-system run: not yet done on the laptop"]
+    "blocked": ["listening checks pending", "laptop run not yet done", "GitHub Actions not yet run on this code"]
   },
-  "uiBenchmark": {"cpu": "AMD Ryzen 7 7700X", "gpu": "AMD Radeon RX 6600 XT", "monitors": 1, "idleCpuPctOfOneCore": 0.365, "idleUiFps": 9.97, "idleWorkingSetMiB": 43.3},
-  "audioBenchmark": {"device": null, "sampleRate": null, "frames": null, "p99CallbackLoadPct": null, "xruns": null, "workingSetMiB": null, "nullReason": "Phase 00 has no audio engine"}
+  "uiBenchmark": {"cpu": "AMD Ryzen 7 7700X", "gpu": "AMD Radeon RX 6600 XT", "monitors": 1, "idleCpuPctOfOneCore": 0.729, "idleUiFps": 9.98, "idleWorkingSetMiB": 45.4},
+  "audioBenchmark": {"device": "Speakers (High Definition Audio Device)", "sampleRate": 48000, "frames": 256, "p99CallbackLoadPct": 0.5, "peakCallbackLoadPct": 2.71, "xruns": 0, "seconds": 1800, "note": "Metronome only, silent output, no tracks yet. p99 is the upper edge of a 0.5% histogram bin."}
 }

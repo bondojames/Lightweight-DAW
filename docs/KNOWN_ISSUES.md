@@ -12,13 +12,24 @@
 | KI-006 | Keyboard and high-contrast support exist, but ImGui does not expose controls to screen readers. | Screen readers cannot read the UI | Document in help; revisit before v1.0 |
 | KI-007 | Build Tools has no debugger, so crash dumps cannot be read on this machine yet. | Slower crash diagnosis | Install WinDbg when needed |
 
+## Phase 01
+
+| ID | Issue | Impact | Plan |
+|---|---|---|---|
+| KI-008 | Most drivers here only offer 10 ms (441 or 480 frames) in WASAPI shared mode. Of 4 outputs on this PC, only the generic Windows HD driver gave 128 and 256. | Higher latency than requested; the UI says so | Exclusive mode or ASIO before v1.0 |
+| KI-009 | A rate other than the device's uses Windows resampling and the 10 ms period. | Latency only; timing measured within 1 frame | Accept; add engine-side resampling only if needed |
+| KI-010 | Device dropout detection is timing-based and cannot see glitches inside the driver (ADR-017). | A real glitch could show 0 dropouts | Listening tests; compare loopback captures in later phases |
+| KI-011 | Changing device stops the transport and keeps the position. | Press Play again after a device change | Accepted for now |
+| KI-012 | Only one tempo segment and fixed 4/4. | No tempo map editing yet | Phase 02 onward |
+| KI-013 | The load percentile has 0.5% resolution. | Low loads all read "0.5%" | Finer bins near zero if useful |
+
 ## Blocked evidence
 
 | Item | Needs |
 |---|---|
 | Dual-monitor checks (manual 4, 13, 14) | A second display. None is connected to the PC. The laptop plus a monitor or TV would work, and would also test mixed scaling |
 | Clean-system run | Run the ZIP on the laptop if it has no developer tools, or use Windows Sandbox or a VM. The ZIP has run from a fresh extract with no developer PATH on this PC, which is weaker evidence |
-| Windows CI result | Confirm the first run in the repo's Actions tab |
+| Laptop results | The owner has a laptop; its model and results are not yet recorded |
 
 ## Hardware for later phases
 
