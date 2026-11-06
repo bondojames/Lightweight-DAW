@@ -396,15 +396,17 @@ void Application::buildSelfTest() {
         {"dragging a gain slider follows the mouse and is one undo step",
          [this] {
              const auto& g = uiState_.timeline.geometry;
-             testGain_ = history_.current()->tracks[0].gain;
+             // The recorded slider belongs to the last track drawn.
+             testGain_ = history_.current()->tracks.back().gain;
              testRevision_ = history_.revision();
              sendDrag(g.gainSliderX - 40.0f, g.gainSliderY, g.gainSliderX + 40.0f, g.gainSliderY);
          },
          [this] {
-             const float dragged = history_.current()->tracks[0].gain;
+             const float dragged = history_.current()->tracks.back().gain;
              const bool moved = dragged > testGain_ && history_.revision() > testRevision_ + 1; // Several live changes...
+             log::info(std::format("  slider drag: gain {:.3f} to {:.3f}, {} revisions", testGain_, dragged, history_.revision() - testRevision_));
              history_.undo();
-             return moved && history_.current()->tracks[0].gain == testGain_; // ...undone in one step.
+             return moved && history_.current()->tracks.back().gain == testGain_; // ...undone in one step.
          }, 30},
         {"Shift-dragging the ruler sets a loop",
          [this] {
