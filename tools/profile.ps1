@@ -6,7 +6,8 @@ param(
     [string]$OutDir = "$PSScriptRoot\..\build\profile",
     [int]$SettleSeconds = 60,
     [int]$ProfileSeconds = 60,
-    [string[]]$Modes = @('idle', 'active', 'minimized', 'detached', 'playing')
+    [string[]]$Modes = @('idle', 'active', 'minimized', 'detached', 'playing'),
+    [string]$OpenAudio = ''
 )
 $ErrorActionPreference = 'Stop'
 $Modes = $Modes -split ','
@@ -18,6 +19,7 @@ foreach ($mode in $Modes) {
     if (Test-Path $json) { Remove-Item -Force $json }
     $arguments = @('--profile', $mode, '--settle-seconds', $SettleSeconds, '--profile-seconds', $ProfileSeconds,
                    '--profile-out', "`"$json`"", '--data-dir', "`"$dataDir`"")
+    if ($OpenAudio) { $arguments += @('--open-audio', "`"$OpenAudio`"") }
     $process = Start-Process -FilePath $Exe -ArgumentList $arguments -PassThru
     if (-not $process.WaitForExit(($SettleSeconds + $ProfileSeconds + 60) * 1000)) {
         $process.Kill()

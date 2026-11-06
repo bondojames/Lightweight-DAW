@@ -10,13 +10,13 @@ if (-not (Test-Path $exe)) { throw "Release build not found. Run tools\build.cmd
 
 # --- Only DLLs that ship with Windows are allowed until a phase adds audited ones.
 $allowedDlls = @('KERNEL32.dll', 'USER32.dll', 'GDI32.dll', 'SHELL32.dll', 'ole32.dll', 'OLEAUT32.dll', 'ADVAPI32.dll',
-                 'd3d11.dll', 'dxgi.dll', 'd3dcompiler_47.dll', 'dwmapi.dll', 'IMM32.dll', 'dbghelp.dll', 'PSAPI.dll', 'SHCORE.dll', 'AVRT.dll')
+                 'd3d11.dll', 'dxgi.dll', 'd3dcompiler_47.dll', 'dwmapi.dll', 'IMM32.dll', 'dbghelp.dll', 'PSAPI.dll', 'SHCORE.dll', 'AVRT.dll', 'sndfile.dll')
 $dependencies = & dumpbin /dependents $exe | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '\.dll$' }
 foreach ($dll in $dependencies) {
     if ($dll -match '^Qt') { throw "Forbidden Qt dependency: $dll" }
     if ($allowedDlls -notcontains $dll) { throw "Unreviewed DLL dependency: $dll. Audit it, then add it here." }
 }
-Write-Output "DLL dependencies (all Windows system DLLs): $($dependencies -join ', ')"
+Write-Output "DLL dependencies (Windows system DLLs, plus sndfile.dll): $($dependencies -join ', ')"
 
 # --- Assemble the portable folder.
 $outDir = Join-Path $root "builds\phase-$Phase"
@@ -29,6 +29,9 @@ Copy-Item (Join-Path $root 'LICENSE-EXCEPTION.md') $outDir
 Copy-Item (Join-Path $root 'THIRD_PARTY_NOTICES.md') $outDir
 Copy-Item (Join-Path $root 'packaging\portable\README_FIRST.txt') $outDir
 Copy-Item (Join-Path $root '.deps\imgui-src\LICENSE.txt') (Join-Path $outDir 'licenses\imgui-LICENSE.txt')
+Copy-Item (Join-Path $root 'build\release\bin\sndfile.dll') $outDir
+Copy-Item (Join-Path $root '.deps\sndfile-src\COPYING') (Join-Path $outDir 'licenses\libsndfile-COPYING.txt')
+Copy-Item (Join-Path $root '.deps\samplerate-src\COPYING') (Join-Path $outDir 'licenses\libsamplerate-COPYING.txt')
 
 # --- ZIP it beside the folder.
 $zip = Join-Path $root "builds\LightweightDAW-phase-$Phase-win64.zip"

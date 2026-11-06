@@ -1,9 +1,13 @@
-LightweightDAW (working title) - Phase 01 build
+LightweightDAW (working title) - Phase 02 build
 
 WHAT THIS IS
-The application shell plus real audio output: a transport, a metronome and a
-test tone through your choice of Windows audio device. There are no tracks,
-recording or projects yet.
+Real audio playback with an editable timeline: import audio files, then arrange,
+trim, split and loop them, with gain, pan, mute and solo on each track. Your files
+are never changed.
+
+THERE IS NO SAVE YET
+Projects arrive in the next phase. Anything you arrange is lost when you close
+the app. Recording and MIDI come later too.
 
 HOW TO RUN
 1. Extract this whole ZIP to any folder.
@@ -15,6 +19,11 @@ Windows 11, x64, with a Direct3D 11 graphics driver. No account, no telemetry.
 
 WHAT TO TRY
 Turn your volume down first.
+- Drag a WAV, AIFF, FLAC, MP3 or M4A onto the Timeline panel, then press Space.
+- Drag clips to move them, and drag their edges to trim. S splits at the playhead,
+  Ctrl+D duplicates, Delete removes, Ctrl+Z undoes. Hold Alt to ignore snapping.
+- Click the ruler to move the playhead. Shift-drag the ruler to set a loop region.
+- Ctrl+wheel zooms, the wheel scrolls, and Shift+wheel scrolls tracks.
 - Tick Metronome and press Play or the Space bar.
 - Tick Test tone for a steady, quiet 440 Hz note.
 - Audio menu: choose the output device, sample rate and buffer size.

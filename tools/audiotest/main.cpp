@@ -10,11 +10,13 @@
 #include "core/commands/Edits.h"
 #include "engine/device/WasapiBackend.h"
 #include "engine/graph/ArrangementSnapshot.h"
+#include "engine/media/MediaImport.h"
 #include "engine/media/MediaManager.h"
 #include "engine/render/OfflineRender.h"
 #include "engine/runtime/RtGuard.h"
 #include "engine/telemetry/AudioTelemetry.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -56,6 +58,7 @@ struct Options {
     double bpm = 120.0;
     int restarts = 10;
     int tracks = 8;
+    bool keepFile = false;
     std::wstring jsonPath;
 };
 
@@ -296,6 +299,63 @@ int commandPlaylist(const Options& options) {
     return (misses == 0 && g_realtimeAllocations.load() == 0 && g_realtimeDiskReads.load() == 0) ? 0 : 3;
 }
 
+// How a very long file behaves: import time and the size of its waveform overview.
+int commandImportBench(const Options& options) {
+    const auto dir = std::filesystem::temp_directory_path() / L"ldaw_importbench";
+    std::filesystem::create_directories(dir);
+    const auto path = dir / L"long.wav";
+    const auto frames = static_cast<std::uint64_t>(options.seconds * 48000.0);
+    {
+        // Written in pieces: the point of the test is that nothing holds it all in memory.
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        const std::uint64_t dataBytes = frames * 8;
+        if (dataBytes > 0xFFFFFFF0ull - 36) {
+            std::printf("Too long for a plain WAV.\n");
+            return 2;
+        }
+        const auto put32 = [&](std::uint32_t v) { out.write(reinterpret_cast<const char*>(&v), 4); };
+        const auto put16 = [&](std::uint16_t v) { out.write(reinterpret_cast<const char*>(&v), 2); };
+        out.write("RIFF", 4);
+        put32(static_cast<std::uint32_t>(36 + dataBytes));
+        out.write("WAVEfmt ", 8);
+        put32(16);
+        put16(3);
+        put16(2);
+        put32(48000);
+        put32(48000 * 8);
+        put16(8);
+        put16(32);
+        out.write("data", 4);
+        put32(static_cast<std::uint32_t>(dataBytes));
+        std::vector<float> chunk(48000 * 2);
+        for (std::uint64_t done = 0; done < frames;) {
+            const auto count = static_cast<std::size_t>(std::min<std::uint64_t>(48000, frames - done));
+            for (std::size_t i = 0; i < count; ++i) chunk[i * 2] = chunk[i * 2 + 1] = 0.2f * static_cast<float>(std::sin(static_cast<double>(done + i) * 0.03));
+            out.write(reinterpret_cast<const char*>(chunk.data()), static_cast<std::streamsize>(count * 8));
+            done += count;
+        }
+    }
+
+    PreparedMedia prepared;
+    std::string error;
+    const auto start = std::chrono::steady_clock::now();
+    if (!prepareMedia(path, 48000.0, dir / L"cache", prepared, error)) {
+        std::printf("Import failed: %s\n", error.c_str());
+        return 3;
+    }
+    const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::size_t peakBytes = 0;
+    for (const auto& level : prepared.peaks->levels) {
+        for (const auto& bins : level.bins) peakBytes += bins.size() * sizeof(PeakBin);
+    }
+    const auto cacheBytes = std::filesystem::file_size(prepared.cachePath);
+    emit(options, std::format("{{\n  \"mode\": \"importbench\",\n  \"audioSeconds\": {:.0f},\n  \"importSeconds\": {:.2f},\n  \"speedMultiple\": {:.1f},\n  \"waveformKiB\": {},\n  \"waveformLevels\": {},\n  \"cacheMiB\": {}\n}}\n",
+                              options.seconds, elapsed, options.seconds / elapsed, peakBytes / 1024, prepared.peaks->levels.size(), cacheBytes / (1024 * 1024)));
+    std::error_code ec;
+    if (!options.keepFile) std::filesystem::remove_all(dir, ec);
+    return 0;
+}
+
 Options parse(int argc, wchar_t** argv) {
     Options options;
     const auto narrow = [](std::wstring_view text) {
@@ -316,6 +376,7 @@ Options parse(int argc, wchar_t** argv) {
         else if (key == L"--bpm") options.bpm = std::wcstod(value, nullptr);
         else if (key == L"--restarts") options.restarts = _wtoi(value);
         else if (key == L"--tracks") options.tracks = _wtoi(value);
+        else if (key == L"--keep") options.keepFile = _wtoi(value) != 0;
         else if (key == L"--json") options.jsonPath = value;
         else if (key == L"--stall-ms") options.stream.testStallMs = std::wcstod(value, nullptr);
         else if (key == L"--stall-every") options.stream.testStallEverySeconds = std::wcstod(value, nullptr);
@@ -334,6 +395,7 @@ int wmain(int argc, wchar_t** argv) {
     else if (options.command == "restarts") result = commandRestarts(options);
     else if (options.command == "loopback") result = commandLoopback(options);
     else if (options.command == "playlist") result = commandPlaylist(options);
+    else if (options.command == "importbench") result = commandImportBench(options);
     else std::printf("Commands: list | run | restarts | loopback\nOptions: --seconds S --frames N --rate R --device ID --gain G --bpm B --restarts N --tracks N --json FILE\n");
     CoUninitialize();
     return result;

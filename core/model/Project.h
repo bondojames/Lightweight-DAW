@@ -9,7 +9,7 @@
 namespace ldaw::model {
 
 // Audio positions are stored in a unit that divides exactly into every supported
-// sample rate, so a device rate change can't move anything (ADR-019).
+// sample rate, so a device rate change can't move anything (ADR-020).
 using Time = std::int64_t;
 constexpr Time kTimePerSecond = 705600000;
 

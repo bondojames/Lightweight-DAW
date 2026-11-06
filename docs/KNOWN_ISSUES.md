@@ -23,6 +23,22 @@
 | KI-012 | Only one tempo segment and fixed 4/4. | No tempo map editing yet | Phase 02 onward |
 | KI-013 | The load percentile has 0.5% resolution. | Low loads all read "0.5%" | Finer bins near zero if useful |
 
+## Phase 02
+
+| ID | Issue | Impact | Plan |
+|---|---|---|---|
+| KI-014 | **There's no save.** Closing the app loses the arrangement. | Work is lost on exit | Phase 03 |
+| KI-015 | MP3 decoding has no automated test, because Windows has no MP3 encoder to make a fixture. | Covered by hands-on check 2 only | Commit a small redistributable fixture in Phase 03 |
+| KI-016 | The audio cache folder is never cleaned. A one-hour stereo file uses about 1.3 GB per sample rate. | Disk use grows | Size limit and cleanup in Phase 03 |
+| KI-017 | The loop wrap isn't crossfaded, so a loop point on loud audio can click. | Audible on some material | Phase 11 crossfades |
+| KI-018 | Fades are only the fixed 64-frame edge fades. Overlapping clips simply mix. | No user fades or crossfades yet | Phase 11 |
+| KI-019 | No time-stretch: audio stays at its own tempo when the BPM changes. | By design for now | Phase 11 |
+| KI-020 | Ogg Vorbis isn't supported, though the spec lists it where vetted. | Those files are refused with a message | Audit a decoder later |
+| KI-021 | Multichannel files keep only their first 2 channels. | Surround content is reduced | Out of v1.0 scope |
+| KI-022 | Windows N editions without Media Foundation can only import WAV and AIFF. | Others fail with a clear message | Accepted |
+| KI-023 | The waveform's finest detail is 256 frames per bin, so extreme zoom shows blocks. | Display only | Finer data if needed |
+| KI-024 | Scrubbing moves the playhead but doesn't play sound while dragging. | Not required yet | Later |
+
 ## Blocked evidence
 
 | Item | Needs |

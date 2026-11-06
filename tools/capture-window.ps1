@@ -12,6 +12,7 @@ public static class CaptureNative {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 }
 '@
@@ -21,6 +22,7 @@ $handle = $process.MainWindowHandle
 if ($handle -eq [IntPtr]::Zero) { throw "Process $ProcessId has no main window." }
 [void][CaptureNative]::SetForegroundWindow($handle)
 Start-Sleep -Milliseconds 600
+if ([CaptureNative]::GetForegroundWindow() -ne $handle) { throw "The target window is not in front, so a capture would show something else." }
 $rect = New-Object CaptureNative+RECT
 [void][CaptureNative]::GetWindowRect($handle, [ref]$rect)
 $width = $rect.Right - $rect.Left

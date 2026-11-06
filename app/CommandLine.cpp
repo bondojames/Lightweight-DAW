@@ -16,6 +16,7 @@ CommandLine parseCommandLine(int argc, wchar_t** argv) {
         else if (arg == L"--ui-self-test") out.uiSelfTest = true;
         else if (arg == L"--smoke-seconds" && value) { out.smokeSeconds = std::wcstod(value, nullptr); ++i; }
         else if (arg == L"--data-dir" && value) { out.dataDir = value; ++i; }
+        else if (arg == L"--open-audio" && value) { out.openAudio = value; ++i; }
         else if (arg == L"--settle-seconds" && value) { out.settleSeconds = std::wcstod(value, nullptr); ++i; }
         else if (arg == L"--profile-seconds" && value) { out.profileSeconds = std::wcstod(value, nullptr); ++i; }
         else if (arg == L"--profile-out" && value) { out.profileOut = value; ++i; }

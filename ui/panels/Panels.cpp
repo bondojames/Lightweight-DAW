@@ -279,7 +279,7 @@ void drawAbout(UiState& state) {
         ImGui::Text("Build %s", LDAW_COMMIT);
         ImGui::Spacing();
         ImGui::TextWrapped("Free software under the GNU General Public License, version 3 or later, with a permission for loading non-GPL plug-ins and drivers. See LICENSE and LICENSE-EXCEPTION.md beside the program.");
-        ImGui::TextWrapped("Uses Dear ImGui %s (MIT). See THIRD_PARTY_NOTICES.md beside the program.", ImGui::GetVersion());
+        ImGui::TextWrapped("Uses Dear ImGui %s (MIT), libsndfile (LGPL) and libsamplerate (BSD). See THIRD_PARTY_NOTICES.md beside the program.", ImGui::GetVersion());
         ImGui::Spacing();
         ImGui::TextWrapped("No account, cloud service or telemetry.");
     }

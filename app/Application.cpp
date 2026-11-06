@@ -155,6 +155,7 @@ bool Application::initialize(int showCommand) {
     uiState_.history = &history_;
     uiState_.audioService = audio_.get();
     audio_->setProject(history_.current());
+    if (args_.openAudio) requestImport(*args_.openAudio, model::kNoId, 0);
     applyAudioConfig();
 
     const std::string startWorkspace = preferences_.getString("ui.workspace", "production");
@@ -346,6 +347,7 @@ void Application::renderFrame(double time) {
         profilePresentMs_ += presentMs;
         profileMaxViewports_ = std::max(profileMaxViewports_, ImGui::GetPlatformIO().Viewports.Size);
         profileDrawCalls_ = std::max(profileDrawCalls_, ui::ImGuiHost::countDrawCalls());
+        profileVertices_ = std::max(profileVertices_, ui::ImGuiHost::countVertices());
     }
     uiState_.drawCalls = ui::ImGuiHost::countDrawCalls();
     uiState_.vertices = ui::ImGuiHost::countVertices();
@@ -491,13 +493,13 @@ bool Application::finishProfile() {
         "  \"monitors\": {},\n  \"logicalCores\": {},\n  \"frames\": {},\n  \"framesPerSecond\": {:.2f},\n"
         "  \"processCpuPctOfOneCore\": {:.3f},\n  \"processCpuPctOfSystem\": {:.3f},\n  \"uiThreadCpuPctOfOneCore\": {:.3f},\n"
         "  \"avgBuildMs\": {:.3f},\n  \"avgRenderMs\": {:.3f},\n  \"avgPresentMsIncludingVsyncWait\": {:.3f},\n"
-        "  \"maxDrawCalls\": {},\n  \"maxViewports\": {},\n  \"workingSetMiB\": {:.1f},\n  \"maxWorkingSetMiB\": {:.1f},\n"
+        "  \"maxDrawCalls\": {},\n  \"maxVertices\": {},\n  \"maxViewports\": {},\n  \"workingSetMiB\": {:.1f},\n  \"maxWorkingSetMiB\": {:.1f},\n"
         "  \"privateMiB\": {:.1f},\n  \"mainWindowMinimized\": {},\n  \"audioStatus\": \"{}\",\n  \"audioDevice\": \"{}\",\n  \"audioSampleRate\": {:.0f},\n"
         "  \"audioPeriodFrames\": {},\n  \"audioP99LoadPct\": {:.1f},\n  \"audioPeakLoadPct\": {:.2f},\n  \"xrunsEngine\": {},\n  \"xrunsDevice\": {}\n}}\n",
         profileModeName(args_.profile), args_.settleSeconds, elapsed, device_.adapterName(), device_.isWarp() ? "true" : "false",
         platform::WindowHost::monitorWorkAreas().size(), sample.logicalCores, frames, static_cast<double>(frames) / elapsed,
         sample.processCpuOfOneCore, sample.processCpuOfSystem, sample.uiThreadCpuOfOneCore, profileBuildMs_ / divisor,
-        profileRenderMs_ / divisor, profilePresentMs_ / divisor, profileDrawCalls_, profileMaxViewports_,
+        profileRenderMs_ / divisor, profilePresentMs_ / divisor, profileDrawCalls_, profileVertices_, profileMaxViewports_,
         static_cast<double>(sample.workingSetBytes) / 1048576.0, static_cast<double>(profileMaxWorkingSet_) / 1048576.0,
         static_cast<double>(sample.privateBytes) / 1048576.0, window_.isMinimized() ? "true" : "false",
         engine::audioStatusText(uiState_.audio.status), uiState_.audio.stream.deviceName, uiState_.audio.stream.sampleRate, uiState_.audio.stream.periodFrames,

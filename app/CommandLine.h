@@ -13,6 +13,7 @@ struct CommandLine {
     bool testCrash = false;                     // Deliberately crashes, to prove dumps are written.
     bool uiSelfTest = false;                    // Scripted UI checks; exit code 0 means all passed.
     double smokeSeconds = 0.0;                  // Run this long, then exit with a status code.
+    std::optional<std::filesystem::path> openAudio; // Import this file at startup; for testing.
     std::optional<std::filesystem::path> dataDir;
     ProfileMode profile = ProfileMode::None;
     double settleSeconds = 60.0;

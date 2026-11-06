@@ -107,6 +107,7 @@ private:
     std::uint64_t profileMaxWorkingSet_ = 0;
     int profileMaxViewports_ = 0;
     int profileDrawCalls_ = 0;
+    int profileVertices_ = 0;
 
     // --ui-self-test: scripted checks of docking, workspaces and recovery (UiSelfTest.cpp).
     void buildSelfTest();
