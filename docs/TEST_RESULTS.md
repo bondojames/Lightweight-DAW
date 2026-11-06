@@ -185,7 +185,23 @@ GitHub Actions has not run Phase 02, because it isn't pushed yet.
 
 ## Phase 02, hands-on
 
-Checklist: `tests/manual/phase-02.md`. All 18 rows: PENDING.
+Checklist: `tests/manual/phase-02.md`.
+
+**First round (build f0c7b2a), reported by the owner on 2026-11-06: FAILED.** Clips couldn't be selected, moved or trimmed. The ruler, scrolling, zoom and sliders did nothing. Dropped clips always landed at the start, on a new track. File > Import audio showed a Save dialog. All automated tests had passed on that build, because none of them used the mouse.
+
+Causes, fixed in 6a5e43b:
+- A clip rectangle pop left the window's input clip stuck on the track headers, so the canvas received no input.
+- A stray `SameLine` started the timeline on the toolbar row, shifting and squeezing it, and it stopped drawing in narrow panels.
+- The drop position came from the last mouse position, but Windows sends no mouse moves during a file drag.
+- Every dialog other than Open used the Save dialog.
+
+Regression coverage: the self-test now sends simulated clicks, drags and wheel input through the real widgets (36 steps, Release and Debug). With the clip bug temporarily restored, 10 of those steps fail. The test does not use the physical mouse, so the owner's retest remains the real check. The Import dialog has no automated test.
+
+The slider failure is not fully explained. The gain slider step passed with the clip bug restored, and passes now (a drag moved gain from 0.063 to 0.610, with one undo step), so hands-on confirmation is needed.
+
+**Second round (build 1fb6681): PENDING.** All 18 rows.
+
+Playlist and UI cost numbers above are from f0c7b2a. Since then, only UI code, dialogs and tests have changed, and the audio engine has not.
 
 ## Not run
 

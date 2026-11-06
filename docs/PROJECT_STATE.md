@@ -1,9 +1,9 @@
 # Project State
 Spec: v2.0, with changes in `docs/DECISIONS.md` | Current branch: main | HEAD: see `git log`
 Accepted phase: 01 (tag phase-01-accepted). Phase 00 is BLOCKED only on its three dual-monitor checks.
-Active phase/task: Phase 02 | Status: IMPLEMENTED_UNVERIFIED, awaiting hands-on checks
+Active phase/task: Phase 02 | Status: IMPLEMENTED_UNVERIFIED. The first hands-on round failed; fixes await the owner's retest.
 Toolchain/deps: MSVC 14.44 (VS 2022 Build Tools), CMake 4.4.4, Ninja, Windows SDK 10.0.26100; Dear ImGui v1.93.0-docking at b916186e; libsndfile 1.2.2 at 72f6af15 (DLL); libsamplerate 0.2.2 at c96f5e3d; WASAPI and Media Foundation from Windows
-Verified builds: `builds/phase-02/`, built from f0c7b2a; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
+Verified builds: `builds/phase-02/`, built from 1fb6681; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
 Repository: https://github.com/bondojames/Lightweight-DAW (public)
 
 Implemented today (verified by automated tests or a real run):
@@ -16,7 +16,7 @@ Implemented today (verified by automated tests or a real run):
 - `LightweightDAW_audiotest.exe`: headless device tests, including loopback timing, an 8-track playlist and a long-file import benchmark.
 - Phase 02: immutable project versions with undo; import via libsndfile and Media Foundation with resampling and a float cache; waveform pyramid; arrangement snapshots; block disk streaming with a preload gate; timeline and inspector UI. There is no save yet.
 
-MP3 import has never been run, and no person has used the timeline yet: `tests/manual/phase-02.md`.
+MP3 import has never been run, and no person has used the fixed timeline yet: `tests/manual/phase-02.md`.
 
 Owner confirmed all 12 Phase 01 listening checks: `tests/manual/phase-01.md`.
 
