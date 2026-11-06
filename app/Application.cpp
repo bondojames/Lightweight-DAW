@@ -197,7 +197,12 @@ void Application::updateFrameState(double time) {
         ui::applyTheme(themeId_, scale);
         log::info(std::format("Main window DPI scale is now {:.2f}", scale));
     }
-    scheduler_.setMinimized(window_.isMinimized());
+    const bool minimized = window_.isMinimized();
+    if (minimized != wasMinimized_) {
+        wasMinimized_ = minimized;
+        log::info(std::format("Main window {} at {:.2f} s", minimized ? "minimized" : "restored", time));
+    }
+    scheduler_.setMinimized(minimized);
     scheduler_.setOccluded(occluded_);
     scheduler_.setHasSecondaryViewports(ImGui::GetPlatformIO().Viewports.Size > 1);
 }
@@ -355,13 +360,18 @@ bool Application::finishProfile() {
         "  \"processCpuPctOfOneCore\": {:.3f},\n  \"processCpuPctOfSystem\": {:.3f},\n  \"uiThreadCpuPctOfOneCore\": {:.3f},\n"
         "  \"avgBuildMs\": {:.3f},\n  \"avgRenderMs\": {:.3f},\n  \"avgPresentMsIncludingVsyncWait\": {:.3f},\n"
         "  \"maxDrawCalls\": {},\n  \"maxViewports\": {},\n  \"workingSetMiB\": {:.1f},\n  \"maxWorkingSetMiB\": {:.1f},\n"
-        "  \"privateMiB\": {:.1f}\n}}\n",
+        "  \"privateMiB\": {:.1f},\n  \"mainWindowMinimized\": {}\n}}\n",
         profileModeName(args_.profile), args_.settleSeconds, elapsed, device_.adapterName(), device_.isWarp() ? "true" : "false",
         platform::WindowHost::monitorWorkAreas().size(), sample.logicalCores, frames, static_cast<double>(frames) / elapsed,
         sample.processCpuOfOneCore, sample.processCpuOfSystem, sample.uiThreadCpuOfOneCore, profileBuildMs_ / divisor,
         profileRenderMs_ / divisor, profilePresentMs_ / divisor, profileDrawCalls_, profileMaxViewports_,
         static_cast<double>(sample.workingSetBytes) / 1048576.0, static_cast<double>(profileMaxWorkingSet_) / 1048576.0,
         static_cast<double>(sample.privateBytes) / 1048576.0, window_.isMinimized() ? "true" : "false");
+    // Someone restoring the window mid-run would silently invalidate the measurement.
+    if (args_.profile == ProfileMode::Minimized && (!window_.isMinimized() || frames != 0)) {
+        log::error("Minimized profile is invalid: the window was restored during the run");
+        return false;
+    }
     return static_cast<bool>(out);
 }
 

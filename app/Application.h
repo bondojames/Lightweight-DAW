@@ -66,6 +66,7 @@ private:
     bool insideModalTick_ = false;
     bool simulateDeviceLoss_ = false;
     bool occluded_ = false;
+    bool wasMinimized_ = false;
     float appliedDpiScale_ = 0.0f;
     int themeId_ = 0;
     ui::DialogRequest pendingDialog_ = ui::DialogRequest::None;
