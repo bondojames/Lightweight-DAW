@@ -24,17 +24,66 @@ std::string defaultDeviceId(const std::vector<AudioDeviceInfo>& devices) {
 
 } // namespace
 
-AudioService::AudioService(std::unique_ptr<IAudioBackend> backend) : backend_(std::move(backend)) {
+AudioService::AudioService(std::unique_ptr<IAudioBackend> backend, std::filesystem::path cacheDirectory) : backend_(std::move(backend)) {
+    if (cacheDirectory.empty()) cacheDirectory = std::filesystem::temp_directory_path() / L"LightweightDAW-cache";
+    media_ = std::make_unique<MediaManager>(std::move(cacheDirectory), [this] {
+        {
+            const std::scoped_lock lock(mutex_);
+            recompileRequested_ = true;
+        }
+        wake_.notify_all();
+    });
+    streamer_ = std::make_unique<DiskStreamer>(engine_);
     thread_ = std::thread([this] { threadMain(); });
 }
 
 AudioService::~AudioService() {
+    media_->cancelAll();
     {
         const std::scoped_lock lock(mutex_);
         quit_ = true;
     }
     wake_.notify_all();
-    thread_.join();
+    thread_.join(); // Stops the audio stream, so nothing below can still be in use by it.
+    streamer_.reset();
+    engine_.exchangeSnapshot(nullptr);
+    media_.reset();
+}
+
+void AudioService::setProject(std::shared_ptr<const model::Project> project) {
+    {
+        const std::scoped_lock lock(mutex_);
+        project_ = std::move(project);
+        recompileRequested_ = true;
+    }
+    wake_.notify_all();
+}
+
+void AudioService::dropSnapshot() {
+    // Only with the stream stopped, so nothing can still be reading it.
+    engine_.exchangeSnapshot(nullptr);
+    streamer_->setSnapshot(nullptr);
+    liveSnapshot_.reset();
+    retiredSnapshots_.clear();
+}
+
+void AudioService::recompile() {
+    std::shared_ptr<const model::Project> project;
+    {
+        const std::scoped_lock lock(mutex_);
+        project = project_;
+    }
+    if (!project) return;
+    auto next = compileSnapshot(*project, compiledRate_, [this](const model::MediaItem& item) { return media_->runtimeFor(item.path); }, trackSlots_);
+    engine_.exchangeSnapshot(next.get());
+    streamer_->setSnapshot(next);
+    if (liveSnapshot_) retiredSnapshots_.push_back({std::move(liveSnapshot_), engine_.processCount() + 2});
+    liveSnapshot_ = std::move(next);
+}
+
+void AudioService::freeRetiredSnapshots(bool streamRunning) {
+    const std::uint64_t now = engine_.processCount();
+    std::erase_if(retiredSnapshots_, [&](const RetiredSnapshot& retired) { return !streamRunning || retired.safeAfter <= now; });
 }
 
 void AudioService::open(const AudioStreamConfig& config) {
@@ -81,6 +130,7 @@ void AudioService::updateDevices() {
 
 void AudioService::openNow() {
     backend_->stop();
+    dropSnapshot(); // It's in frames at the old rate. A new one is built once the rate is known.
     auto devices = backend_->enumerateOutputs();
     const std::string defaultId = defaultDeviceId(devices);
     AudioStreamConfig config = config_;
@@ -105,6 +155,11 @@ void AudioService::openNow() {
 
     const bool started = backend_->start(config, engine_, telemetry_);
     openedDefaultId_ = defaultId;
+    if (started) {
+        compiledRate_ = backend_->streamInfo().sampleRate;
+        media_->setSampleRate(compiledRate_);
+        recompile();
+    }
     publish([&](AudioServiceState& state) {
         state.devices = std::move(devices);
         state.status = backend_->status();
@@ -122,10 +177,13 @@ void AudioService::threadMain() {
         std::optional<AudioStreamConfig> openRequest;
         std::optional<std::filesystem::path> offlineRequest;
         bool refresh = false;
+        bool needRecompile = false;
         {
             std::unique_lock lock(mutex_);
-            wake_.wait_for(lock, kPollInterval, [this] { return quit_ || pendingOpen_ || pendingOfflineTest_ || refreshRequested_; });
+            wake_.wait_for(lock, kPollInterval, [this] { return quit_ || pendingOpen_ || pendingOfflineTest_ || refreshRequested_ || recompileRequested_; });
             if (quit_) break;
+            needRecompile = recompileRequested_;
+            recompileRequested_ = false;
             openRequest.swap(pendingOpen_);
             offlineRequest.swap(pendingOfflineTest_);
             refresh = refreshRequested_;
@@ -138,6 +196,9 @@ void AudioService::threadMain() {
             openNow();
             nextRetry = std::chrono::steady_clock::now() + kRetryInterval;
         }
+
+        if (needRecompile) recompile();
+        freeRetiredSnapshots(backend_->status() == AudioStatus::Running);
 
         const bool devicesChanged = backend_->takeDevicesChanged();
         if (devicesChanged || refresh) {
@@ -180,6 +241,7 @@ void AudioService::threadMain() {
     }
 
     backend_->stop();
+    dropSnapshot();
     backend_.reset(); // COM objects must go before this thread leaves COM.
     CoUninitialize();
 }

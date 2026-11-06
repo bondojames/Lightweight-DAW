@@ -12,6 +12,9 @@ add_executable(LightweightDAW_tests
   unit/test_device_logic.cpp
   unit/test_audio_service.cpp
   unit/test_media_import.cpp
+  unit/test_model.cpp
+  unit/test_playback.cpp
+  unit/test_timeline_view.cpp
 )
 target_link_libraries(LightweightDAW_tests PRIVATE ldaw_core ldaw_ui_logic ldaw_engine ldaw_engine_api ldaw_plugins_api ldaw_sndfile_dll)
 add_test(NAME unit COMMAND LightweightDAW_tests)

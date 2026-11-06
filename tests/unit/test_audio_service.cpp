@@ -212,3 +212,44 @@ TEST_CASE(offline_test_needs_no_device_and_reports_a_pass) {
     CHECK(back.left.size() == 16u * 48000u);
     std::filesystem::remove(path);
 }
+
+TEST_CASE(a_project_reaches_the_audio_thread_after_import) {
+    FakeWorld world;
+    world.devices = {kSpeakers};
+    const auto cache = std::filesystem::temp_directory_path() / L"ldaw_service_cache";
+    AudioService service(std::make_unique<FakeBackend>(world), cache);
+    service.open({});
+    CHECK(waitFor([&] { return service.state().status == AudioStatus::Running; }));
+
+    StereoBuffer tone;
+    tone.left.assign(48000, 0.25f);
+    tone.right.assign(48000, 0.25f);
+    const auto path = std::filesystem::temp_directory_path() / L"ldaw_service_tone.wav";
+    CHECK(writeWavFloat32(path, tone, 48000));
+
+    service.media().requestImport(7, path);
+    std::vector<ImportResult> results;
+    CHECK(waitFor([&] {
+        results = service.media().takeResults();
+        return !results.empty();
+    }));
+    CHECK(results[0].token == 7);
+    CHECK(results[0].ok);
+    CHECK(results[0].framesAtSourceRate == 48000);
+    CHECK(service.media().peaksFor(path) != nullptr);
+    CHECK(service.media().runtimeFor(path) != nullptr);
+    std::filesystem::remove(path);
+}
+
+TEST_CASE(a_bad_import_reports_its_error) {
+    FakeWorld world;
+    AudioService service(std::make_unique<FakeBackend>(world), std::filesystem::temp_directory_path() / L"ldaw_service_cache");
+    service.media().requestImport(9, L"Z:/no/such/file.wav");
+    std::vector<ImportResult> results;
+    CHECK(waitFor([&] {
+        results = service.media().takeResults();
+        return !results.empty();
+    }));
+    CHECK(!results[0].ok);
+    CHECK(!results[0].error.empty());
+}

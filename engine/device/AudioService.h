@@ -2,6 +2,7 @@
 #pragma once
 #include "engine/AudioEngine.h"
 #include "engine/device/IAudioBackend.h"
+#include "engine/media/MediaManager.h"
 #include "engine/render/OfflineRender.h"
 #include "engine/telemetry/AudioTelemetry.h"
 
@@ -33,7 +34,7 @@ struct AudioServiceState {
 // neither depends on the renderer or the UI, so audio survives anything the GPU does.
 class AudioService {
 public:
-    explicit AudioService(std::unique_ptr<IAudioBackend> backend);
+    explicit AudioService(std::unique_ptr<IAudioBackend> backend, std::filesystem::path cacheDirectory = {});
     ~AudioService();
     AudioService(const AudioService&) = delete;
     AudioService& operator=(const AudioService&) = delete;
@@ -46,8 +47,19 @@ public:
     AudioServiceState state() const;
     std::uint64_t stateGeneration() const { return generation_.load(std::memory_order_relaxed); }
 
+    // Publishes a new project version; a snapshot compiled from it reaches the audio
+    // thread shortly after. Returns immediately.
+    void setProject(std::shared_ptr<const model::Project> project);
+    MediaManager& media() { return *media_; }
+    std::uint64_t diskMissFrames() const { return engine_.diskMissFrames(); }
+    std::uint64_t streamedBlocks() const { return streamer_ ? streamer_->loadedBlocks() : 0; }
+
     // One thread only (the UI thread) may post commands.
-    bool post(const EngineCommand& command) { return engine_.post(command); }
+    bool post(const EngineCommand& command) {
+        const bool ok = engine_.post(command);
+        if (streamer_) streamer_->nudge();
+        return ok;
+    }
     EngineState engineState() const { return engine_.state(); }
     float takeOutputPeak() { return engine_.takeOutputPeak(); }
     AudioTelemetry& telemetry() { return telemetry_; }
@@ -57,16 +69,34 @@ private:
     void openNow();
     void updateDevices();
     void publish(const std::function<void(AudioServiceState&)>& change);
+    void recompile();
+    void freeRetiredSnapshots(bool streamRunning);
+    void dropSnapshot();
+
+    struct RetiredSnapshot {
+        std::shared_ptr<const ArrangementSnapshot> snapshot;
+        std::uint64_t safeAfter = 0;
+    };
 
     std::unique_ptr<IAudioBackend> backend_;
     AudioEngine engine_;
     AudioTelemetry telemetry_;
+    std::unique_ptr<MediaManager> media_;
+    std::unique_ptr<DiskStreamer> streamer_;
     std::thread thread_;
+
+    // Control thread only.
+    std::shared_ptr<const ArrangementSnapshot> liveSnapshot_;
+    std::vector<RetiredSnapshot> retiredSnapshots_;
+    TrackSlots trackSlots_;
+    double compiledRate_ = 48000.0;
 
     mutable std::mutex mutex_; // Never taken by the audio thread.
     std::condition_variable wake_;
     bool quit_ = false;
     bool refreshRequested_ = false;
+    bool recompileRequested_ = false;
+    std::shared_ptr<const model::Project> project_;
     std::optional<AudioStreamConfig> pendingOpen_;
     std::optional<std::filesystem::path> pendingOfflineTest_;
     AudioServiceState state_;

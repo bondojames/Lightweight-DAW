@@ -38,6 +38,8 @@ add_library(ldaw_core STATIC
   core/layout/Geometry.cpp
   core/layout/LayoutFile.cpp
   core/logging/Log.cpp
+  core/model/Project.cpp
+  core/commands/Edits.cpp
 )
 target_link_libraries(ldaw_core PUBLIC ldaw_warnings)
 
@@ -48,8 +50,11 @@ add_library(ldaw_engine STATIC
   engine/device/AudioService.cpp
   engine/media/AudioDecoder.cpp
   engine/media/MediaImport.cpp
+  engine/media/MediaRuntime.cpp
+  engine/media/MediaManager.cpp
+  engine/graph/ArrangementSnapshot.cpp
 )
-target_link_libraries(ldaw_engine PUBLIC ldaw_warnings PRIVATE avrt ole32 uuid mfuuid ldaw_sndfile_dll samplerate)
+target_link_libraries(ldaw_engine PUBLIC ldaw_warnings ldaw_core PRIVATE avrt ole32 uuid mfuuid ldaw_sndfile_dll samplerate)
 
 # Real-device test tool. Links no ImGui or Direct3D.
 add_executable(LightweightDAW_audiotest tools/audiotest/main.cpp)

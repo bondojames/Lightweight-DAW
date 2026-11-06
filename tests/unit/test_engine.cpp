@@ -20,6 +20,7 @@ using namespace ldaw::engine;
 // --- Proves "no heap allocation in the callback": every new and delete in this test
 // program is counted when it happens inside a RealtimeSection.
 static std::atomic<int> g_realtimeAllocations{0};
+int ldawRealtimeAllocations() { return g_realtimeAllocations.load(); }
 
 void* operator new(std::size_t size) {
     if (g_inRealtimeSection) g_realtimeAllocations.fetch_add(1);
