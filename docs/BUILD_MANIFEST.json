@@ -1,6 +1,6 @@
 {
   "phase": "02",
-  "status": "IMPLEMENTED_UNVERIFIED",
+  "status": "ACCEPTED",
   "commit": "1fb668125df1",
   "toolchain": {"compiler": "MSVC", "compilerVersion": "14.44.35207", "imguiDockingVersion": "v1.93.0-docking b916186e66aa3c02b72c6ca17455516512ed8049", "graphics": "Win32+D3D11", "libsndfile": "1.2.2 72f6af15e8f85157bd622ed45b979025828b7001", "libsamplerate": "0.2.2 c96f5e3de9c4488f4e6c97f59f5245f22fda22f7"},
   "artifact": {
@@ -14,7 +14,7 @@
     "dateUTC": "2026-11-06",
     "passed": 3,
     "failed": 0,
-    "blocked": ["first hands-on round failed and was fixed; 18 checks pending on this build", "MP3 import never run", "GitHub Actions not yet run on this code"]
+    "blocked": ["GitHub Actions not yet run on this code: not pushed"]
   },
   "uiBenchmark": {"cpu": "AMD Ryzen 7 7700X", "gpu": "AMD Radeon RX 6600 XT", "monitors": 1, "idleCpuPctOfOneCore": 0.443, "playingCpuPctOfOneCore": 1.641, "idleUiFps": 9.98, "maxWorkingSetMiB": 52.5},
   "audioBenchmark": {"device": "Speakers (High Definition Audio Device)", "sampleRate": 48000, "frames": 256, "tracks": 8, "p99CallbackLoadPct": 0.5, "peakCallbackLoadPct": 1.33, "xruns": 0, "diskMissFrames": 0, "seconds": 600, "note": "Silent output. All tracks play one file, so this is not 8 independent disk streams. p99 is the upper edge of a 0.5% histogram bin."}

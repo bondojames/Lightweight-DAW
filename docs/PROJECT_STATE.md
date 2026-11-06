@@ -1,7 +1,7 @@
 # Project State
 Spec: v2.0, with changes in `docs/DECISIONS.md` | Current branch: main | HEAD: see `git log`
-Accepted phase: 01 (tag phase-01-accepted). Phase 00 is BLOCKED only on its three dual-monitor checks.
-Active phase/task: Phase 02 | Status: IMPLEMENTED_UNVERIFIED. The first hands-on round failed; fixes await the owner's retest.
+Accepted phases: 01 and 02 (tags phase-01-accepted, phase-02-accepted). Phase 00 is BLOCKED only on its three dual-monitor checks.
+Active phase/task: none. Phase 03 is next, and the owner has asked not to start it yet.
 Toolchain/deps: MSVC 14.44 (VS 2022 Build Tools), CMake 4.4.4, Ninja, Windows SDK 10.0.26100; Dear ImGui v1.93.0-docking at b916186e; libsndfile 1.2.2 at 72f6af15 (DLL); libsamplerate 0.2.2 at c96f5e3d; WASAPI and Media Foundation from Windows
 Verified builds: `builds/phase-02/`, built from 1fb6681; hashes in `docs/HANDOFF.md`. Builds are not stored in Git.
 Repository: https://github.com/bondojames/Lightweight-DAW (public)
@@ -16,7 +16,7 @@ Implemented today (verified by automated tests or a real run):
 - `LightweightDAW_audiotest.exe`: headless device tests, including loopback timing, an 8-track playlist and a long-file import benchmark.
 - Phase 02: immutable project versions with undo; import via libsndfile and Media Foundation with resampling and a float cache; waveform pyramid; arrangement snapshots; block disk streaming with a preload gate; timeline and inspector UI. There is no save yet.
 
-MP3 import has never been run, and no person has used the fixed timeline yet: `tests/manual/phase-02.md`.
+Owner confirmed all 18 Phase 02 hands-on checks on the fixed build, including MP3: `tests/manual/phase-02.md`.
 
 Owner confirmed all 12 Phase 01 listening checks: `tests/manual/phase-01.md`.
 
@@ -35,9 +35,9 @@ Benchmark: `toolsprofile.ps1` and `LightweightDAW_audiotest`. 7700X, 48 kHz, 256
 
 Blocking issues:
 - Phase 00 checks 4, 13, 14 need a second display.
-- Phase 02 hands-on checks pending.
 - Laptop results not yet recorded (ADR-005 Tier 3).
 - OPEN-002: ASIO driver and audio interface.
+- Phase 01 tag and Phase 02 are not on GitHub yet, so CI has not run on Phase 02.
 
 Decisions changed since last handoff: ADR-018 to ADR-023.
 Next file: docs/NEXT_TASK.md

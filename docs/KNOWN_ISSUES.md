@@ -28,7 +28,7 @@
 | ID | Issue | Impact | Plan |
 |---|---|---|---|
 | KI-014 | **There's no save.** Closing the app loses the arrangement. | Work is lost on exit | Phase 03 |
-| KI-015 | MP3 decoding has no automated test, because Windows has no MP3 encoder to make a fixture. | Covered by hands-on check 2 only | Commit a small redistributable fixture in Phase 03 |
+| KI-015 | MP3 decoding has no automated test, because Windows has no MP3 encoder to make a fixture. | The owner confirmed it by hand on real files, but a regression would go unnoticed | Commit a small redistributable fixture in Phase 03 |
 | KI-016 | The audio cache folder is never cleaned. A one-hour stereo file uses about 1.3 GB per sample rate. | Disk use grows | Size limit and cleanup in Phase 03 |
 | KI-017 | The loop wrap isn't crossfaded, so a loop point on loud audio can click. | Audible on some material | Phase 11 crossfades |
 | KI-018 | Fades are only the fixed 64-frame edge fades. Overlapping clips simply mix. | No user fades or crossfades yet | Phase 11 |

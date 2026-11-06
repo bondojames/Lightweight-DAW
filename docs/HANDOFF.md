@@ -1,7 +1,7 @@
 # Continuation Handoff
-Commit: 1fb6681 is the built code; later commits are docs only | Accepted tag: phase-01-accepted | Working tree clean? Yes when this was committed
+Commit: 1fb6681 is the built code; later commits are docs only | Accepted tag: phase-02-accepted | Working tree clean? Yes when this was committed
 
-This session completed (verified): Phase 02 code, automated tests, playlist soak, profile and packaging. Details in `docs/TEST_RESULTS.md`. Phase 02 commits and the Phase 01 tag are local only until the owner approves a push.
+This session completed (verified): Phase 02 code, automated tests, playlist soak, profile, packaging and owner hands-on checks. Details in `docs/TEST_RESULTS.md`. Both accepted tags and the Phase 02 commits are local only until the owner approves a push.
 
 Build artifacts: `builds/phase-02/`, `builds/LightweightDAW-phase-02-win64.zip`
 SHA256:
@@ -15,7 +15,7 @@ Commands actually executed + results:
 - `LightweightDAW_audiotest playlist` (run at f0c7b2a; the engine is unchanged since): 10 minutes, and 5 minutes limited to 4 cores: 0 dropouts, 0 disk misses.
 - `LightweightDAW_audiotest importbench --seconds 1800`: 0.47 s with the source in the OS cache.
 
-Runtime/manual verification actually done: the owner tested f0c7b2a and the timeline failed; causes and fixes are in TEST_RESULTS. I inspected one screenshot of the fixed layout. The fixed build has not been used by a person yet, and MP3 import has never been run.
+Runtime/manual verification actually done: the owner tested f0c7b2a and the timeline failed (causes in TEST_RESULTS), then reported all 18 checks passing on 1fb6681, including MP3.
 
 CPU/audio load/xruns/RAM baseline delta: playing with a clip: 1.64% of one core, up from 1.28% with only a metronome. Working set 52 MiB, up from 45.
 
@@ -35,4 +35,4 @@ Advice for next engineer:
 - `Start-Process` makes Windows ignore the first `ShowWindow` argument.
 - `MsgWaitForMultipleObjectsEx` timeouts round up to 15.6 ms. Use the existing waitable timer.
 
-Next action: read NEXT_TASK.md then execute; do not skip tests.
+Next action: wait for the owner to ask for Phase 03, then read NEXT_TASK.md and execute; do not skip tests.

@@ -1,5 +1,5 @@
 # Next Engineering Task
-Phase / issue: Phase 03 (browser, project save and load, undo, recovery), once the owner finishes `tests/manual/phase-02.md`.
+Phase / issue: Phase 03 (browser, project save and load, undo, recovery). Do not start until the owner asks.
 
 User-visible outcome: create a multi-clip project, save it to a folder, close the app, reopen it and keep editing.
 

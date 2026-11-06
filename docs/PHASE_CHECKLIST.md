@@ -4,7 +4,7 @@
 |---|---|---|
 | 00 | Build infrastructure and native ImGui shell | BLOCKED (dual-monitor checks) |
 | 01 | Audio callback, test tone, metronome, diagnostics | ACCEPTED (tag phase-01-accepted) |
-| 02 | Audio track arrangement, import, playback | IMPLEMENTED_UNVERIFIED (hands-on checks) |
+| 02 | Audio track arrangement, import, playback | ACCEPTED (tag phase-02-accepted) |
 | 03 | Browser, project save/load, undo, recovery | PLANNED |
 | 04 | Audio capture and physical input | PLANNED |
 | 05 | MIDI engine, piano roll, basic instrument | PLANNED |
