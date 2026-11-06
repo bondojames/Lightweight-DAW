@@ -7,13 +7,18 @@
 #include <wrl/client.h>
 
 #include "engine/AudioEngine.h"
+#include "core/commands/Edits.h"
 #include "engine/device/WasapiBackend.h"
+#include "engine/graph/ArrangementSnapshot.h"
+#include "engine/media/MediaManager.h"
 #include "engine/render/OfflineRender.h"
 #include "engine/runtime/RtGuard.h"
 #include "engine/telemetry/AudioTelemetry.h"
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
+#include <filesystem>
 #include <cstdio>
 #include <cstdlib>
 #include <cwchar>
@@ -50,6 +55,7 @@ struct Options {
     double gain = 0.0; // Silent by default; only listening tests ask for sound.
     double bpm = 120.0;
     int restarts = 10;
+    int tracks = 8;
     std::wstring jsonPath;
 };
 
@@ -212,6 +218,84 @@ int commandLoopback(const Options& options) {
     return report.passed ? 0 : 4;
 }
 
+// Plays a real multi-track arrangement through the device, with the disk streamer and
+// periodic seeks. The acceptance test for "no disk I/O in the callback".
+int commandPlaylist(const Options& options) {
+    const auto dir = std::filesystem::temp_directory_path() / L"ldaw_playlist";
+    std::filesystem::create_directories(dir);
+
+    // Eight seconds of a decaying tone, repeated across the song by many short clips.
+    StereoBuffer source;
+    const std::size_t sourceFrames = 48000 * 8;
+    source.left.resize(sourceFrames);
+    for (std::size_t i = 0; i < sourceFrames; ++i) {
+        const double t = static_cast<double>(i) / 48000.0;
+        source.left[i] = static_cast<float>(0.2 * std::sin(6.283185 * 220.0 * t) * std::exp(-t / 3.0));
+    }
+    source.right = source.left;
+    const auto path = dir / L"source.wav";
+    if (!writeWavFloat32(path, source, 48000)) return 2;
+
+    WasapiBackend backend;
+    AudioEngine engine;
+    AudioTelemetry telemetry;
+    MediaManager media(dir / L"cache", {});
+    if (!backend.start(options.stream, engine, telemetry)) {
+        std::printf("Could not start: %s\n", backend.lastError().c_str());
+        return 2;
+    }
+    media.setSampleRate(backend.streamInfo().sampleRate);
+    const double rate = backend.streamInfo().sampleRate;
+
+    media.requestImport(1, path);
+    while (media.takeResults().empty()) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    if (!media.runtimeFor(path)) {
+        std::printf("Could not prepare the source.\n");
+        backend.stop();
+        return 2;
+    }
+
+    namespace cmd = ldaw::commands;
+    ldaw::model::Project project;
+    const auto seconds = [](double s) { return ldaw::model::secondsToTime(s); };
+    const auto mediaId = cmd::addMedia(project, path, seconds(8.0), 2, 48000.0);
+    for (int track = 0; track < options.tracks; ++track) {
+        const auto trackId = cmd::addTrack(project, "T");
+        for (double at = 0.01 * track; at < options.seconds; at += 8.0) cmd::addClip(project, trackId, mediaId, seconds(at));
+    }
+    ldaw::engine::TrackSlots slots;
+    const auto snapshot = compileSnapshot(project, rate, [&](const ldaw::model::MediaItem& item) { return media.runtimeFor(item.path); }, slots);
+
+    DiskStreamer streamer(engine);
+    streamer.setSnapshot(snapshot);
+    engine.exchangeSnapshot(snapshot.get());
+
+    engine.post({EngineCommandType::SetOutputGain, options.gain});
+    engine.post({EngineCommandType::Play, 0.0});
+
+    const auto begin = std::chrono::steady_clock::now();
+    double nextSeek = 60.0;
+    for (;;) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
+        if (elapsed >= options.seconds) break;
+        // A jump each minute, to exercise the preload path, not just steady reading.
+        if (elapsed >= nextSeek) {
+            nextSeek += 60.0;
+            engine.post({EngineCommandType::Seek, std::floor(elapsed * 0.5) * rate});
+            streamer.nudge();
+        }
+    }
+    const auto info = backend.streamInfo();
+    const std::string extra = std::format(",\n  \"tracks\": {},\n  \"diskMissFrames\": {},\n  \"blocksLoaded\": {},\n  \"diskReadFailures\": {},\n  \"realtimeDiskReads\": {}",
+                                          options.tracks, engine.diskMissFrames(), streamer.loadedBlocks(), streamer.readFailures(), g_realtimeDiskReads.load());
+    const std::uint64_t misses = engine.diskMissFrames();
+    backend.stop();
+    engine.exchangeSnapshot(nullptr);
+    emit(options, runResultJson("playlist", options, info, telemetry, options.seconds, extra));
+    return (misses == 0 && g_realtimeAllocations.load() == 0 && g_realtimeDiskReads.load() == 0) ? 0 : 3;
+}
+
 Options parse(int argc, wchar_t** argv) {
     Options options;
     const auto narrow = [](std::wstring_view text) {
@@ -231,6 +315,7 @@ Options parse(int argc, wchar_t** argv) {
         else if (key == L"--gain") options.gain = std::wcstod(value, nullptr);
         else if (key == L"--bpm") options.bpm = std::wcstod(value, nullptr);
         else if (key == L"--restarts") options.restarts = _wtoi(value);
+        else if (key == L"--tracks") options.tracks = _wtoi(value);
         else if (key == L"--json") options.jsonPath = value;
         else if (key == L"--stall-ms") options.stream.testStallMs = std::wcstod(value, nullptr);
         else if (key == L"--stall-every") options.stream.testStallEverySeconds = std::wcstod(value, nullptr);
@@ -248,7 +333,8 @@ int wmain(int argc, wchar_t** argv) {
     else if (options.command == "run") result = commandRun(options);
     else if (options.command == "restarts") result = commandRestarts(options);
     else if (options.command == "loopback") result = commandLoopback(options);
-    else std::printf("Commands: list | run | restarts | loopback\nOptions: --seconds S --frames N --rate R --device ID --gain G --bpm B --restarts N --json FILE\n");
+    else if (options.command == "playlist") result = commandPlaylist(options);
+    else std::printf("Commands: list | run | restarts | loopback\nOptions: --seconds S --frames N --rate R --device ID --gain G --bpm B --restarts N --tracks N --json FILE\n");
     CoUninitialize();
     return result;
 }

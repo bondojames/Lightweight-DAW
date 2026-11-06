@@ -2,6 +2,7 @@
 #pragma once
 #include "app/CommandLine.h"
 #include "core/settings/KeyValueStore.h"
+#include "core/commands/Edits.h"
 #include "engine/device/AudioService.h"
 #include "platform/win32/ProcessMetrics.h"
 #include "platform/win32/WindowHost.h"
@@ -16,6 +17,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -45,6 +47,8 @@ private:
     void handleDrops();
     void applyAudioConfig();
     void updateAudioState();
+    void requestImport(const std::filesystem::path& path, model::Id trackId, model::Time start);
+    void finishImports();
 
     void beginProfileWindow();
     bool finishProfile();
@@ -62,6 +66,14 @@ private:
     platform::ProcessMetrics metrics_;
     ui::UiState uiState_;
     std::unique_ptr<engine::AudioService> audio_;
+    commands::ProjectHistory history_;
+    std::uint64_t publishedRevision_ = 0;
+    std::uint64_t nextImportToken_ = 1;
+    struct PendingImport {
+        model::Id trackId = model::kNoId;
+        model::Time start = 0;
+    };
+    std::map<std::uint64_t, PendingImport> pendingImports_;
     std::uint64_t seenAudioGeneration_ = 0;
     std::filesystem::path offlineWavPending_;
 

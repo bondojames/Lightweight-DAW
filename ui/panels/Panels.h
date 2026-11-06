@@ -5,6 +5,7 @@
 #include "engine/telemetry/AudioTelemetry.h"
 #include "platform/win32/ProcessMetrics.h"
 #include "ui/WorkspaceManager.h"
+#include "ui/arrangement/TimelinePanel.h"
 
 #include <array>
 #include <cstdint>
@@ -13,7 +14,7 @@
 
 namespace ldaw::ui {
 
-enum class DialogRequest { None, Open, Save, OfflineTestWav };
+enum class DialogRequest { None, Open, Save, OfflineTestWav, ImportAudio };
 
 // What the UI asked for this frame. The UI never performs these itself.
 struct UiActions {
@@ -40,6 +41,12 @@ struct UiState {
     Workspace currentWorkspace = Workspace::Production;
 
     // Audio, read from telemetry and never from inside the audio thread's data.
+    commands::ProjectHistory* history = nullptr;
+    engine::AudioService* audioService = nullptr;
+    TimelineState timeline;
+    std::string importMessage;
+    std::uint64_t diskMissFrames = 0;
+    std::uint64_t streamedBlocks = 0;
     engine::AudioServiceState audio;
     engine::EngineState engine;
     double loadP50 = 0.0, loadP95 = 0.0, loadP99 = 0.0;

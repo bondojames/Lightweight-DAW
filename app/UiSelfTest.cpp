@@ -7,11 +7,14 @@
 #include "app/Application.h"
 
 #include "core/logging/Log.h"
+#include "core/commands/Edits.h"
 #include "core/settings/KeyValueStore.h"
+#include "engine/render/OfflineRender.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include <cmath>
 #include <filesystem>
 #include <memory>
 #include <format>
@@ -148,6 +151,47 @@ void Application::buildSelfTest() {
         {"the audio clock survived all of the UI work above", [] {}, clockIsMoving},
         {"Stop halts the clock", [this] { audio_->post({engine::EngineCommandType::Stop, 0.0}); },
          [this, audioIsRunning] { return !audioIsRunning() || !audio_->engineState().playing; }},
+        {"importing a file makes a track and a clip",
+         [this] {
+             const auto path = dataDir_ / L"selftest_tést.wav";
+             engine::StereoBuffer audio;
+             audio.left.resize(96000);
+             for (std::size_t i = 0; i < audio.left.size(); ++i) audio.left[i] = 0.25f * static_cast<float>(std::sin(static_cast<double>(i) * 0.05));
+             audio.right = audio.left;
+             engine::writeWavFloat32(path, audio, 44100);
+             requestImport(path, model::kNoId, 0);
+         },
+         [this] {
+             const auto project = history_.current();
+             return project->tracks.size() == 1 && project->tracks[0].clips.size() == 1 && uiState_.timeline.selectedClip != model::kNoId && uiState_.importMessage.empty();
+         },
+         240},
+        {"a clip plays with no disk misses, while the timeline draws it",
+         [this] {
+             audio_->post({engine::EngineCommandType::Rewind, 0.0});
+             audio_->post({engine::EngineCommandType::Play, 0.0});
+         },
+         [this, audioIsRunning] {
+             if (!audioIsRunning()) return true; // No device to play through.
+             const engine::EngineState state = audio_->engineState();
+             return state.playing && state.positionFrames > 0 && audio_->diskMissFrames() == 0 && audio_->streamedBlocks() > 0;
+         },
+         60},
+        {"split, then undo, restores the clip",
+         [this] {
+             audio_->post({engine::EngineCommandType::Stop, 0.0});
+             const model::Id clip = uiState_.timeline.selectedClip;
+             history_.apply("Split clip", [&](model::Project& p) { return commands::splitClip(p, clip, model::kTimePerSecond) != model::kNoId; });
+         },
+         [this] {
+             if (history_.current()->tracks[0].clips.size() != 2) return false;
+             history_.undo();
+             return history_.current()->tracks[0].clips.size() == 1;
+         }},
+        {"a bad file reports an error and changes nothing",
+         [this] { requestImport(dataDir_ / L"no_such_file.wav", model::kNoId, 0); },
+         [this] { return !uiState_.importMessage.empty() && history_.current()->tracks.size() == 1; },
+         120},
     };
 }
 

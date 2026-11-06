@@ -100,6 +100,7 @@ if(LDAW_BUILD_APP)
     ui/WorkspaceManager.cpp
     ui/Theme.cpp
     ui/panels/Panels.cpp
+    ui/arrangement/TimelinePanel.cpp
     app/LightweightDAW.manifest
   )
   target_link_libraries(LightweightDAW PRIVATE

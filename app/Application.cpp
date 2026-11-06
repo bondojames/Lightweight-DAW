@@ -6,6 +6,7 @@
 #include "BuildInfo.h"
 #include "core/logging/Log.h"
 #include "engine/device/WasapiBackend.h"
+#include "engine/render/OfflineRender.h"
 #include "platform/win32/CrashHandler.h"
 #include "platform/win32/NativeDialogs.h"
 #include "platform/win32/ShellIntegration.h"
@@ -150,7 +151,10 @@ bool Application::initialize(int showCommand) {
         insideModalTick_ = false;
     });
 
-    audio_ = std::make_unique<engine::AudioService>(std::make_unique<engine::WasapiBackend>());
+    audio_ = std::make_unique<engine::AudioService>(std::make_unique<engine::WasapiBackend>(), dataDir_ / L"cache");
+    uiState_.history = &history_;
+    uiState_.audioService = audio_.get();
+    audio_->setProject(history_.current());
     applyAudioConfig();
 
     const std::string startWorkspace = preferences_.getString("ui.workspace", "production");
@@ -232,6 +236,13 @@ void Application::applyAudioConfig() {
 void Application::updateAudioState() {
     if (!audio_) return;
     uiState_.engine = audio_->engineState();
+    uiState_.diskMissFrames = audio_->diskMissFrames();
+    uiState_.streamedBlocks = audio_->streamedBlocks();
+    finishImports();
+    if (history_.revision() != publishedRevision_) {
+        publishedRevision_ = history_.revision();
+        audio_->setProject(history_.current());
+    }
     const std::uint64_t generation = audio_->stateGeneration();
     if (generation == seenAudioGeneration_) return;
     seenAudioGeneration_ = generation;
@@ -242,12 +253,53 @@ void Application::updateAudioState() {
     }
 }
 
+void Application::requestImport(const std::filesystem::path& path, model::Id trackId, model::Time start) {
+    const std::uint64_t token = nextImportToken_++;
+    pendingImports_[token] = {trackId, start};
+    audio_->media().requestImport(token, path);
+    uiState_.importMessage.clear();
+    log::info("Importing " + platform::toUtf8(path.wstring()));
+}
+
+void Application::finishImports() {
+    for (const engine::ImportResult& result : audio_->media().takeResults()) {
+        const auto pending = pendingImports_.find(result.token);
+        if (pending == pendingImports_.end()) continue;
+        const PendingImport where = pending->second;
+        pendingImports_.erase(pending);
+        const std::string name = platform::toUtf8(result.path.filename().wstring());
+        if (!result.ok) {
+            uiState_.importMessage = name + ": " + result.error;
+            log::error("Import failed: " + uiState_.importMessage);
+            continue;
+        }
+        log::info(std::format("Imported {}: {:.0f} Hz, {} channels, via {}", name, result.sourceSampleRate, result.channels, result.decoderName));
+        model::Id clipId = model::kNoId;
+        model::Id trackId = where.trackId;
+        history_.apply("Import " + name, [&](model::Project& project) {
+            const model::Time length = model::framesToTime(result.framesAtSourceRate, result.sourceSampleRate);
+            const model::Id media = commands::addMedia(project, result.path, length, result.channels, result.sourceSampleRate);
+            if (media == model::kNoId) return false;
+            if (trackId == model::kNoId || !project.findTrack(trackId)) trackId = commands::addTrack(project, result.path.stem().string());
+            clipId = commands::addClip(project, trackId, media, where.start);
+            return clipId != model::kNoId;
+        });
+        uiState_.timeline.selectedClip = clipId;
+        uiState_.timeline.selectedTrack = trackId;
+    }
+}
+
 void Application::handleDrops() {
+    bool first = true;
     for (const auto& path : window_.takeDroppedFiles()) {
         const std::string name = platform::toUtf8(path.wstring());
         log::info("Dropped file: " + name);
         uiState_.droppedFiles.insert(uiState_.droppedFiles.begin(), name);
         if (uiState_.droppedFiles.size() > kMaxDroppedFilesShown) uiState_.droppedFiles.pop_back();
+        // The first file lands where it was dropped. Any others get tracks of their own, lined up with it.
+        const ui::TimelineState& timeline = uiState_.timeline;
+        requestImport(path, (first && timeline.dropInside) ? timeline.dropTrack : model::kNoId, timeline.dropInside ? timeline.dropTime : 0);
+        first = false;
     }
 }
 
@@ -333,6 +385,14 @@ void Application::runPendingDialog() {
 
     const auto result = request == ui::DialogRequest::Open ? platform::showOpenFileDialog(window_.hwnd())
                                                            : platform::showSaveFileDialog(window_.hwnd());
+    if (request == ui::DialogRequest::ImportAudio) {
+        if (result) {
+            const double rate = uiState_.engine.sampleRate > 0.0 ? uiState_.engine.sampleRate : 48000.0;
+            requestImport(*result, model::kNoId, model::framesToTime(uiState_.engine.positionFrames, rate));
+        }
+        scheduler_.noteActivity(now());
+        return;
+    }
     if (request == ui::DialogRequest::OfflineTestWav) {
         if (result) {
             auto path = *result;

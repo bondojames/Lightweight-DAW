@@ -34,12 +34,22 @@ void drawMainMenu(WorkspaceManager& workspaces, UiState& state, UiActions& actio
     if (!ImGui::BeginMainMenuBar()) return;
     if (ImGui::BeginMenu("File")) {
         // Projects arrive in Phase 03. These exercise the native dialogs only and say so.
+        if (ImGui::MenuItem("Import audio...")) actions.dialog = DialogRequest::ImportAudio;
+        ImGui::Separator();
         if (ImGui::MenuItem("Test Open dialog...")) actions.dialog = DialogRequest::Open;
         if (ImGui::MenuItem("Test Save dialog...")) actions.dialog = DialogRequest::Save;
         ImGui::Separator();
         if (ImGui::MenuItem("Preferences...")) state.showPreferences = true;
         ImGui::Separator();
         if (ImGui::MenuItem("Exit")) actions.exit = true;
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Edit")) {
+        commands::ProjectHistory& history = *state.history;
+        const std::string undoLabel = history.canUndo() ? "Undo " + history.undoName() : "Undo";
+        const std::string redoLabel = history.canRedo() ? "Redo " + history.redoName() : "Redo";
+        if (ImGui::MenuItem(undoLabel.c_str(), "Ctrl+Z", false, history.canUndo())) history.undo();
+        if (ImGui::MenuItem(redoLabel.c_str(), "Ctrl+Y", false, history.canRedo())) history.redo();
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("View")) {
@@ -128,6 +138,16 @@ void drawTransportBar(UiState& state, UiActions& actions) {
             if (running) ImGui::Text("Audio load: %.1f%% (p99)", state.loadP99);
             else ImGui::TextUnformatted("Audio load: n/a");
             ImGui::Separator();
+            if (state.diskMissFrames > 0) {
+                ImGui::TextUnformatted("DISK TOO SLOW");
+                ImGui::SetItemTooltip("Audio couldn't be read from disk in time, so part of it played as silence.");
+                ImGui::Separator();
+            }
+            if (!state.importMessage.empty()) {
+                ImGui::TextUnformatted("Import failed");
+                ImGui::SetItemTooltip("%s", state.importMessage.c_str());
+                ImGui::Separator();
+            }
             if (state.xrunsEngine + state.xrunsDevice + state.xrunsUnknown > 0) {
                 ImGui::Text("Dropouts: %llu", static_cast<unsigned long long>(state.xrunsEngine + state.xrunsDevice + state.xrunsUnknown));
                 ImGui::Separator();
@@ -170,6 +190,7 @@ void drawDiagnostics(UiState& state, UiActions& actions) {
         row("Dropouts", "%llu engine, %llu device, %llu unknown, over %llu callbacks", static_cast<unsigned long long>(state.xrunsEngine),
             static_cast<unsigned long long>(state.xrunsDevice), static_cast<unsigned long long>(state.xrunsUnknown), static_cast<unsigned long long>(state.callbacks));
         row("Output peak", "%.3f", state.outputPeak);
+        row("Disk streaming", "%llu blocks loaded, %llu frames missed", static_cast<unsigned long long>(state.streamedBlocks), static_cast<unsigned long long>(state.diskMissFrames));
         ImGui::EndTable();
     }
     for (const engine::XrunEvent& event : state.recentXruns) {
@@ -230,12 +251,16 @@ void drawPanels(WorkspaceManager& workspaces, UiState& state, UiActions& actions
             ImGui::SetNextWindowSize(ImVec2(400.0f, 400.0f), ImGuiCond_Always);
         }
 
-        if (ImGui::Begin(def.windowName, &open)) {
+        // The timeline uses the wheel for zooming and scrolling, so the window mustn't.
+        const ImGuiWindowFlags flags = def.id == PanelId::Timeline ? (ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse) : ImGuiWindowFlags_None;
+        if (ImGui::Begin(def.windowName, &open, flags)) {
+            TimelineContext context{*state.history, state.audioService->media(), state.engine, audioRunning(state),
+                                    [&actions](const engine::EngineCommand& command) { actions.commands.push_back(command); }};
             switch (def.id) {
             case PanelId::Library: drawNotImplemented("The file library", 3); break;
-            case PanelId::Timeline: drawNotImplemented("The arrangement timeline", 2); break;
+            case PanelId::Timeline: drawTimelinePanel(state.timeline, context); break;
             case PanelId::Session: drawNotImplemented("The live clip grid", 10); break;
-            case PanelId::Inspector: drawNotImplemented("The inspector", 2); break;
+            case PanelId::Inspector: drawInspectorPanel(state.timeline, context); break;
             case PanelId::PianoRoll: drawNotImplemented("The piano roll", 5); break;
             case PanelId::Mixer: drawNotImplemented("The mixer", 7); break;
             case PanelId::Diagnostics: drawDiagnostics(state, actions); break;
@@ -360,6 +385,13 @@ void drawNotice(WorkspaceManager& workspaces) {
 
 UiActions drawInterface(WorkspaceManager& workspaces, UiState& state) {
     UiActions actions;
+
+    // Undo and redo work anywhere, except while typing.
+    if (!ImGui::GetIO().WantTextInput) {
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) state.history->undo();
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, ImGuiInputFlags_RouteGlobal) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) state.history->redo();
+    }
+
     drawMainMenu(workspaces, state, actions);
     drawTransportBar(state, actions);
 
