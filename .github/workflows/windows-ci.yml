@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: windows-ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test-package:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test (Release)
+        shell: cmd
+        run: tools\build.cmd release
+      - name: Package and test the extracted ZIP
+        shell: cmd
+        # The packaged check uses --warp because hosted runners have no GPU.
+        env:
+          LDAW_PACKAGE_WARP: "1"
+        run: tools\package.cmd 00
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LightweightDAW-win64
+          path: builds/*.zip
+          retention-days: 14

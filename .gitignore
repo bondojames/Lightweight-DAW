@@ -1,0 +1,8 @@
+/build/
+/builds/
+/.deps/
+/out/
+*.user
+*.dmp
+*.pdb
+*.zip

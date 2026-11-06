@@ -1,0 +1,445 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include <windows.h>
+
+#include "app/Application.h"
+
+#include "BuildInfo.h"
+#include "core/logging/Log.h"
+#include "platform/win32/CrashHandler.h"
+#include "platform/win32/NativeDialogs.h"
+#include "platform/win32/ShellIntegration.h"
+#include "ui/Theme.h"
+
+#include <imgui.h>
+
+#include <algorithm>
+#include <cmath>
+#include <format>
+#include <fstream>
+
+namespace ldaw {
+namespace {
+
+constexpr float kClearColor[4] = {0.06f, 0.06f, 0.07f, 1.0f};
+constexpr double kMetricsIntervalSeconds = 1.0;
+constexpr double kDeviceRetrySeconds = 2.0;
+constexpr std::size_t kMaxDroppedFilesShown = 16;
+
+} // namespace
+
+Application::Application(CommandLine args) : args_(std::move(args)) {
+    start_ = std::chrono::steady_clock::now();
+}
+
+Application::~Application() = default;
+
+double Application::now() const {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - start_).count();
+}
+
+void Application::loadPreferences() {
+    preferences_.loadFile(dataDir_ / L"settings.ini");
+    themeId_ = std::clamp(preferences_.getInt("ui.theme", 0), 0, 2);
+
+    FrameScheduler::Config config;
+    const int activeHz = preferences_.getInt("ui.activeHz", 60);
+    config.activeHz = (activeHz == 30) ? 30.0 : 60.0;
+    const int idleHz = preferences_.getInt("ui.idleHz", 10);
+    config.idleHz = (idleHz == 5 || idleHz == 15) ? static_cast<double>(idleHz) : 10.0;
+    scheduler_.setConfig(config);
+
+    uiState_.themeId = themeId_;
+    uiState_.activeHz = static_cast<int>(config.activeHz);
+    uiState_.idleHz = static_cast<int>(config.idleHz);
+}
+
+void Application::savePreferences() {
+    preferences_.setInt("ui.theme", themeId_);
+    preferences_.setInt("ui.activeHz", static_cast<int>(scheduler_.config().activeHz));
+    preferences_.setInt("ui.idleHz", static_cast<int>(scheduler_.config().idleHz));
+    if (window_.hwnd()) {
+        const IntRect bounds = window_.restoredBounds();
+        preferences_.setInt("window.x", bounds.x);
+        preferences_.setInt("window.y", bounds.y);
+        preferences_.setInt("window.w", bounds.w);
+        preferences_.setInt("window.h", bounds.h);
+        preferences_.setInt("window.maximized", window_.isMaximized() ? 1 : 0);
+    }
+    if (!preferences_.saveFile(dataDir_ / L"settings.ini")) log::error("Could not save settings.ini");
+}
+
+IntRect Application::initialWindowBounds() const {
+    const auto monitors = platform::WindowHost::monitorWorkAreas();
+    const float scale = static_cast<float>(GetDpiForSystem()) / 96.0f;
+    IntRect fallback{100, 100, static_cast<int>(1280 * scale), static_cast<int>(800 * scale)};
+    if (!monitors.empty()) {
+        const IntRect& m = monitors.front();
+        fallback.w = std::min(fallback.w, m.w);
+        fallback.h = std::min(fallback.h, m.h);
+        fallback.x = m.x + (m.w - fallback.w) / 2;
+        fallback.y = m.y + (m.h - fallback.h) / 2;
+    }
+    const IntRect saved{preferences_.getInt("window.x", fallback.x), preferences_.getInt("window.y", fallback.y),
+                        preferences_.getInt("window.w", fallback.w), preferences_.getInt("window.h", fallback.h)};
+    return (saved.w > 0 && saved.h > 0) ? rescueRect(saved, monitors) : fallback;
+}
+
+bool Application::initialize(int showCommand) {
+    dataDir_ = args_.dataDir ? *args_.dataDir : platform::resolveDataDirectory();
+    log::open(dataDir_ / L"logs" / L"app.log");
+    platform::installCrashHandler(dataDir_ / L"logs");
+    log::info(std::format("LightweightDAW {} ({}) starting; data dir {}", LDAW_VERSION, LDAW_COMMIT,
+                          platform::toUtf8(dataDir_.wstring())));
+
+    if (args_.testCrash) {
+        volatile int* null = nullptr;
+        *null = 1;
+    }
+
+    loadPreferences();
+
+    if (!window_.create(L"LightweightDAW", initialWindowBounds(), preferences_.getInt("window.maximized", 0) != 0)) {
+        log::error("Could not create the main window");
+        return false;
+    }
+
+    std::string error;
+    if (!device_.create(args_.warp, error) || !swapChain_.create(device_.device(), window_.hwnd())) {
+        if (error.empty()) error = "Could not create the Direct3D 11 swap chain.";
+        log::error(error);
+        MessageBoxW(window_.hwnd(), platform::toWide(error + "\n\nLightweightDAW needs Direct3D 11 to draw its interface.").c_str(),
+                    L"LightweightDAW", MB_OK | MB_ICONERROR);
+        return false;
+    }
+    log::info(std::format("Direct3D 11 on '{}', feature level {}{}", device_.adapterName(), device_.featureLevelName(),
+                          device_.isWarp() ? " (WARP diagnostic mode)" : ""));
+
+    if (!imgui_.initialize(window_.hwnd(), device_.device(), device_.context())) {
+        log::error("Dear ImGui backend initialization failed");
+        return false;
+    }
+    log::info(std::format("Dear ImGui {}; docking {}, viewports {}", ImGui::GetVersion(),
+                          ui::ImGuiHost::dockingEnabled() ? "on" : "off", ui::ImGuiHost::viewportsEnabled() ? "on" : "off"));
+
+    appliedDpiScale_ = window_.dpiScale();
+    ui::applyTheme(themeId_, appliedDpiScale_);
+
+    window_.setMessageHook([this](HWND hwnd, unsigned message, unsigned long long wParam, long long lParam) {
+        if (ui::ImGuiHost::handleMessage(hwnd, message, wParam, lParam)) return true;
+        if (message == WM_CLOSE) { // Shut down in order from the main loop, not inside the message.
+            exitRequested_ = true;
+            return true;
+        }
+        return false;
+    });
+    window_.setModalLoopTick([this] {
+        if (insideModalTick_ || deviceLost_) return;
+        insideModalTick_ = true;
+        const double time = now();
+        updateFrameState(time);
+        scheduler_.noteActivity(time);
+        renderFrame(time);
+        insideModalTick_ = false;
+    });
+
+    const std::string startWorkspace = preferences_.getString("ui.workspace", "production");
+    workspaces_.initialize(dataDir_ / L"layouts",
+                           startWorkspace == "live" ? ui::Workspace::Live : ui::Workspace::Production,
+                           platform::WindowHost::monitorWorkAreas());
+
+    uiState_.adapterName = device_.adapterName();
+    uiState_.featureLevel = device_.featureLevelName();
+    uiState_.warp = device_.isWarp();
+    uiState_.dataDir = platform::toUtf8(dataDir_.wstring());
+
+    window_.show(args_.profile == ProfileMode::Minimized ? SW_SHOWMINNOACTIVE : showCommand);
+    // Windows applies the launcher's show mode to the first ShowWindow call and ignores
+    // its argument, so the measurement mode must ask a second time.
+    if (args_.profile == ProfileMode::Minimized) window_.show(SW_SHOWMINNOACTIVE);
+    if (args_.profile == ProfileMode::Detached) {
+        workspaces_.panelOpen(ui::PanelId::Diagnostics) = true;
+        uiState_.detachDiagnosticsOnce = true;
+    }
+    if (args_.uiSelfTest) buildSelfTest();
+    return true;
+}
+
+void Application::shutdown() {
+    if (imgui_.isInitialized()) {
+        workspaces_.save();
+        preferences_.setString("ui.workspace", workspaces_.current() == ui::Workspace::Live ? "live" : "production");
+        savePreferences();
+        imgui_.shutdown();
+    }
+    swapChain_.destroy();
+    device_.destroy();
+    log::info("Clean shutdown");
+    log::close();
+}
+
+void Application::updateFrameState(double time) {
+    unsigned width = 0, height = 0;
+    if (!deviceLost_ && window_.takePendingResize(width, height)) {
+        if (!swapChain_.resize(device_.device(), width, height)) {
+            log::error("Swap chain resize failed; treating as device loss");
+            deviceLost_ = true;
+            nextDeviceRetryAt_ = time;
+        }
+    }
+    if (window_.takeDisplayChanged()) {
+        workspaces_.notifyDisplayChanged(platform::WindowHost::monitorWorkAreas());
+        log::info("Display configuration changed");
+        scheduler_.noteActivity(time);
+    }
+    const float scale = window_.dpiScale();
+    if (scale != appliedDpiScale_) {
+        appliedDpiScale_ = scale;
+        ui::applyTheme(themeId_, scale);
+        log::info(std::format("Main window DPI scale is now {:.2f}", scale));
+    }
+    scheduler_.setMinimized(window_.isMinimized());
+    scheduler_.setOccluded(occluded_);
+    scheduler_.setHasSecondaryViewports(ImGui::GetPlatformIO().Viewports.Size > 1);
+}
+
+void Application::handleDrops() {
+    for (const auto& path : window_.takeDroppedFiles()) {
+        const std::string name = platform::toUtf8(path.wstring());
+        log::info("Dropped file: " + name);
+        uiState_.droppedFiles.insert(uiState_.droppedFiles.begin(), name);
+        if (uiState_.droppedFiles.size() > kMaxDroppedFilesShown) uiState_.droppedFiles.pop_back();
+    }
+}
+
+void Application::renderFrame(double time) {
+    using Clock = std::chrono::steady_clock;
+    scheduler_.markRendered(time);
+    const auto buildStart = Clock::now();
+
+    workspaces_.beforeNewFrame();
+    imgui_.beginFrame();
+    uiState_.schedulerMode = static_cast<int>(scheduler_.mode(time));
+    uiState_.currentWorkspace = workspaces_.current();
+    const ui::UiActions actions = ui::drawInterface(workspaces_, uiState_);
+    imgui_.endFrameAndBuildDrawData();
+
+    const auto renderStart = Clock::now();
+    swapChain_.bindAndClear(device_.context(), kClearColor);
+    imgui_.renderMainViewport();
+    imgui_.renderSecondaryViewports();
+
+    const auto presentStart = Clock::now();
+    if (!window_.isMinimized()) {
+        const renderer::PresentResult result = swapChain_.present(true);
+        occluded_ = (result == renderer::PresentResult::Occluded);
+        if (result == renderer::PresentResult::DeviceLost) {
+            log::error("Graphics device lost during Present");
+            deviceLost_ = true;
+            nextDeviceRetryAt_ = time;
+        }
+    }
+    const auto end = Clock::now();
+
+    const double buildMs = std::chrono::duration<double, std::milli>(renderStart - buildStart).count();
+    const double renderMs = std::chrono::duration<double, std::milli>(presentStart - renderStart).count();
+    const double presentMs = std::chrono::duration<double, std::milli>(end - presentStart).count();
+    buildMsSum_ += buildMs;
+    renderMsSum_ += renderMs;
+    presentMsSum_ += presentMs;
+    ++framesSinceSample_;
+    ++framesTotal_;
+    if (profileMeasuring_) {
+        profileBuildMs_ += buildMs;
+        profileRenderMs_ += renderMs;
+        profilePresentMs_ += presentMs;
+        profileMaxViewports_ = std::max(profileMaxViewports_, ImGui::GetPlatformIO().Viewports.Size);
+        profileDrawCalls_ = std::max(profileDrawCalls_, ui::ImGuiHost::countDrawCalls());
+    }
+    uiState_.drawCalls = ui::ImGuiHost::countDrawCalls();
+    uiState_.vertices = ui::ImGuiHost::countVertices();
+    uiState_.viewportCount = ImGui::GetPlatformIO().Viewports.Size;
+
+    applyActions(actions);
+}
+
+void Application::applyActions(const ui::UiActions& actions) {
+    if (actions.exit) exitRequested_ = true;
+    if (actions.dialog != ui::DialogRequest::None) pendingDialog_ = actions.dialog;
+    if (actions.simulateDeviceLoss) simulateDeviceLoss_ = true;
+    if (actions.preferencesChanged) {
+        themeId_ = uiState_.themeId;
+        ui::applyTheme(themeId_, appliedDpiScale_);
+        FrameScheduler::Config config = scheduler_.config();
+        config.activeHz = uiState_.activeHz;
+        config.idleHz = uiState_.idleHz;
+        scheduler_.setConfig(config);
+        savePreferences();
+    }
+}
+
+void Application::runPendingDialog() {
+    const ui::DialogRequest request = pendingDialog_;
+    pendingDialog_ = ui::DialogRequest::None;
+    if (request == ui::DialogRequest::None) return;
+
+    const auto result = request == ui::DialogRequest::Open ? platform::showOpenFileDialog(window_.hwnd())
+                                                           : platform::showSaveFileDialog(window_.hwnd());
+    uiState_.lastDialogResult = result ? platform::toUtf8(result->wstring()) : std::string("(cancelled)");
+    log::info(std::format("{} dialog returned: {}", request == ui::DialogRequest::Open ? "Open" : "Save", uiState_.lastDialogResult));
+    scheduler_.noteActivity(now());
+}
+
+void Application::sampleMetrics() {
+    const double time = now();
+    uiState_.process = metrics_.sample();
+    uiState_.pushCpuHistory(static_cast<float>(uiState_.process.processCpuOfOneCore));
+    const double elapsed = time - lastSampleTime_;
+    uiState_.fps = elapsed > 0.0 ? framesSinceSample_ / elapsed : 0.0;
+    const double divisor = framesSinceSample_ > 0 ? framesSinceSample_ : 1;
+    uiState_.buildMs = buildMsSum_ / divisor;
+    uiState_.renderMs = renderMsSum_ / divisor;
+    uiState_.presentMs = presentMsSum_ / divisor;
+    uiState_.framesTotal = framesTotal_;
+    uiState_.monitorCount = static_cast<int>(platform::WindowHost::monitorWorkAreas().size());
+    uiState_.dpiScale = appliedDpiScale_;
+    buildMsSum_ = renderMsSum_ = presentMsSum_ = 0.0;
+    framesSinceSample_ = 0;
+    lastSampleTime_ = time;
+    profileMaxWorkingSet_ = std::max(profileMaxWorkingSet_, uiState_.process.workingSetBytes);
+}
+
+void Application::recoverDevice(double time) {
+    if (time < nextDeviceRetryAt_) return;
+    nextDeviceRetryAt_ = time + kDeviceRetrySeconds;
+
+    imgui_.suspendBackends();
+    swapChain_.destroy();
+    std::string error;
+    if (!device_.create(args_.warp, error) || !swapChain_.create(device_.device(), window_.hwnd())) {
+        log::error("Graphics device recovery failed; will retry. " + error);
+        return;
+    }
+    if (!imgui_.resumeBackends(device_.device(), device_.context())) {
+        log::error("Could not restart the ImGui backends; will retry");
+        return;
+    }
+    deviceLost_ = false;
+    occluded_ = false;
+    uiState_.adapterName = device_.adapterName();
+    uiState_.deviceRecoveries += 1;
+    log::info("Graphics device recovered");
+    scheduler_.noteActivity(time);
+}
+
+void Application::beginProfileWindow() {
+    profileMetrics_.emplace(1); // Baseline is now; everything before is discarded.
+    profileMeasuring_ = true;
+    profileStart_ = now();
+    profileEndAt_ = profileStart_ + args_.profileSeconds;
+    profileFramesAtStart_ = framesTotal_;
+    profileMaxWorkingSet_ = 0;
+    log::info(std::format("Profile window started: {}", profileModeName(args_.profile)));
+}
+
+bool Application::finishProfile() {
+    const double elapsed = now() - profileStart_;
+    const platform::ProcessSample sample = profileMetrics_->sample();
+    profileMaxWorkingSet_ = std::max(profileMaxWorkingSet_, sample.workingSetBytes);
+    const std::uint64_t frames = framesTotal_ - profileFramesAtStart_;
+    const double divisor = frames > 0 ? static_cast<double>(frames) : 1.0;
+
+    std::ofstream out(args_.profileOut, std::ios::trunc);
+    out << std::format(
+        "{{\n  \"mode\": \"{}\",\n  \"settleSeconds\": {:.0f},\n  \"seconds\": {:.2f},\n  \"adapter\": \"{}\",\n  \"warp\": {},\n"
+        "  \"monitors\": {},\n  \"logicalCores\": {},\n  \"frames\": {},\n  \"framesPerSecond\": {:.2f},\n"
+        "  \"processCpuPctOfOneCore\": {:.3f},\n  \"processCpuPctOfSystem\": {:.3f},\n  \"uiThreadCpuPctOfOneCore\": {:.3f},\n"
+        "  \"avgBuildMs\": {:.3f},\n  \"avgRenderMs\": {:.3f},\n  \"avgPresentMsIncludingVsyncWait\": {:.3f},\n"
+        "  \"maxDrawCalls\": {},\n  \"maxViewports\": {},\n  \"workingSetMiB\": {:.1f},\n  \"maxWorkingSetMiB\": {:.1f},\n"
+        "  \"privateMiB\": {:.1f}\n}}\n",
+        profileModeName(args_.profile), args_.settleSeconds, elapsed, device_.adapterName(), device_.isWarp() ? "true" : "false",
+        platform::WindowHost::monitorWorkAreas().size(), sample.logicalCores, frames, static_cast<double>(frames) / elapsed,
+        sample.processCpuOfOneCore, sample.processCpuOfSystem, sample.uiThreadCpuOfOneCore, profileBuildMs_ / divisor,
+        profileRenderMs_ / divisor, profilePresentMs_ / divisor, profileDrawCalls_, profileMaxViewports_,
+        static_cast<double>(sample.workingSetBytes) / 1048576.0, static_cast<double>(profileMaxWorkingSet_) / 1048576.0,
+        static_cast<double>(sample.privateBytes) / 1048576.0, window_.isMinimized() ? "true" : "false");
+    return static_cast<bool>(out);
+}
+
+int Application::run(int showCommand) {
+    if (!initialize(showCommand)) {
+        shutdown();
+        return 1;
+    }
+
+    int exitCode = 0;
+    bool running = true;
+    while (running && !exitRequested_) {
+        if (!window_.pumpMessages()) break;
+        const double time = now();
+
+        if (args_.smokeSeconds > 0.0 && time >= args_.smokeSeconds) {
+            log::info(std::format("Smoke run finished after {} frames", framesTotal_));
+            exitCode = framesTotal_ > 0 ? 0 : 2;
+            running = false;
+            continue;
+        }
+        if (args_.profile != ProfileMode::None) {
+            if (!profileMeasuring_ && time >= args_.settleSeconds) beginProfileWindow();
+            if (profileMeasuring_ && time >= profileEndAt_) {
+                exitCode = finishProfile() ? 0 : 3;
+                running = false;
+                continue;
+            }
+            if (args_.profile == ProfileMode::Active) scheduler_.noteActivity(time);
+        }
+
+        if (args_.uiSelfTest) {
+            stepSelfTest(time);
+            if (selfTestDone_) {
+                exitCode = selfTestFailures_ == 0 ? 0 : 4;
+                running = false;
+                continue;
+            }
+        }
+
+        handleDrops();
+        if (simulateDeviceLoss_) {
+            simulateDeviceLoss_ = false;
+            log::info("Simulating graphics device loss from Diagnostics");
+            deviceLost_ = true;
+            nextDeviceRetryAt_ = time;
+        }
+        if (deviceLost_) recoverDevice(time);
+
+        updateFrameState(time);
+
+        if (time >= nextMetricsAt_) {
+            sampleMetrics();
+            nextMetricsAt_ = time + kMetricsIntervalSeconds;
+        }
+
+        if (!deviceLost_ && scheduler_.shouldRender(time)) {
+            if (scheduler_.mode(time) == FrameScheduler::Mode::Occluded) {
+                scheduler_.markRendered(time);
+                occluded_ = swapChain_.probe() == renderer::PresentResult::Occluded;
+            } else {
+                renderFrame(time);
+            }
+            if (pendingDialog_ != ui::DialogRequest::None) runPendingDialog();
+        }
+
+        const double afterFrame = now();
+        double wait = std::max(0.0, nextMetricsAt_ - afterFrame);
+        const double untilFrame = deviceLost_ ? kDeviceRetrySeconds : scheduler_.secondsUntilNextFrame(afterFrame);
+        if (untilFrame >= 0.0) wait = std::min(wait, untilFrame);
+        if (args_.smokeSeconds > 0.0) wait = std::min(wait, std::max(0.0, args_.smokeSeconds - afterFrame));
+        if (profileMeasuring_) wait = std::min(wait, std::max(0.0, profileEndAt_ - afterFrame));
+
+        if (window_.waitForMessages(wait)) scheduler_.noteActivity(now());
+    }
+
+    shutdown();
+    return exitCode;
+}
+
+} // namespace ldaw

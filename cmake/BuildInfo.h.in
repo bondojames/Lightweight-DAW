@@ -1,0 +1,3 @@
+#pragma once
+#define LDAW_VERSION "@PROJECT_VERSION@"
+#define LDAW_COMMIT "@LDAW_COMMIT@"
