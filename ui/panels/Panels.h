@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "engine/AudioEngine.h"
+#include "engine/device/AudioService.h"
+#include "engine/telemetry/AudioTelemetry.h"
 #include "platform/win32/ProcessMetrics.h"
 #include "ui/WorkspaceManager.h"
 
@@ -10,14 +13,16 @@
 
 namespace ldaw::ui {
 
-enum class DialogRequest { None, Open, Save };
+enum class DialogRequest { None, Open, Save, OfflineTestWav };
 
 // What the UI asked for this frame. The UI never performs these itself.
 struct UiActions {
     bool exit = false;
     bool preferencesChanged = false;
     bool simulateDeviceLoss = false;
+    bool audioConfigChanged = false;
     DialogRequest dialog = DialogRequest::None;
+    std::vector<engine::EngineCommand> commands;
 };
 
 // A read-only view of app state, plus the UI's own harmless view state.
@@ -33,6 +38,20 @@ struct UiState {
     bool warp = false;
     std::vector<std::string> droppedFiles;
     Workspace currentWorkspace = Workspace::Production;
+
+    // Audio, read from telemetry and never from inside the audio thread's data.
+    engine::AudioServiceState audio;
+    engine::EngineState engine;
+    double loadP50 = 0.0, loadP95 = 0.0, loadP99 = 0.0;
+    float loadPeak = 0.0f, outputPeak = 0.0f;
+    std::uint64_t callbacks = 0, xrunsEngine = 0, xrunsDevice = 0, xrunsUnknown = 0;
+    std::vector<engine::XrunEvent> recentXruns;
+
+    // The chosen audio settings; what the driver really gave is in audio.stream.
+    std::string audioDeviceId;
+    int audioRate = 0;
+    int audioFrames = 256;
+    double bpmInput = 120.0;
 
     int themeId = 0, activeHz = 60, idleHz = 10;
     bool showAbout = false, showPreferences = false;

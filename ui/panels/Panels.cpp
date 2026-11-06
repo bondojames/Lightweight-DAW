@@ -8,16 +8,21 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include <cmath>
+
 namespace ldaw::ui {
 namespace {
 
-constexpr engine::AudioStatus kAudioStatus = engine::AudioStatus::NotInitialized; // Until Phase 01.
+using engine::EngineCommandType;
+
+bool audioRunning(const UiState& state) { return state.audio.status == engine::AudioStatus::Running; }
 
 double toMiB(std::uint64_t bytes) { return static_cast<double>(bytes) / 1048576.0; }
 
 const char* schedulerModeName(int mode) {
     switch (static_cast<FrameScheduler::Mode>(mode)) {
     case FrameScheduler::Mode::Active: return "active";
+    case FrameScheduler::Mode::Animating: return "playing";
     case FrameScheduler::Mode::Idle: return "idle";
     case FrameScheduler::Mode::Occluded: return "occluded";
     case FrameScheduler::Mode::Hidden: return "hidden";
@@ -46,6 +51,14 @@ void drawMainMenu(WorkspaceManager& workspaces, UiState& state, UiActions& actio
         }
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Audio")) {
+        if (ImGui::MenuItem("Audio settings...")) state.showPreferences = true;
+        if (ImGui::MenuItem("Reconnect audio device")) actions.audioConfigChanged = true;
+        ImGui::Separator();
+        if (ImGui::MenuItem("Run offline metronome test...", nullptr, false, !state.audio.offlineTestRunning)) actions.dialog = DialogRequest::OfflineTestWav;
+        ImGui::SetItemTooltip("Renders 16 seconds with no audio device, saves a WAV, and measures the beat timing.");
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("Workspace")) {
         if (ImGui::MenuItem("Production", nullptr, workspaces.current() == Workspace::Production)) workspaces.requestSwitch(Workspace::Production);
         if (ImGui::MenuItem("Live", nullptr, workspaces.current() == Workspace::Live)) workspaces.requestSwitch(Workspace::Live);
@@ -60,24 +73,65 @@ void drawMainMenu(WorkspaceManager& workspaces, UiState& state, UiActions& actio
     ImGui::EndMainMenuBar();
 }
 
-void drawTransportBar(const UiState& state) {
+void togglePlayback(const UiState& state, UiActions& actions) {
+    actions.commands.push_back({state.engine.playing ? EngineCommandType::Stop : EngineCommandType::Play, 0.0});
+}
+
+void drawTransportBar(UiState& state, UiActions& actions) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const bool running = audioRunning(state);
+
+    // Space plays and stops, unless the user is typing or moving by keyboard.
+    const ImGuiIO& io = ImGui::GetIO();
+    if (running && !io.WantTextInput && !io.NavVisible && ImGui::Shortcut(ImGuiKey_Space, ImGuiInputFlags_RouteGlobal)) {
+        togglePlayback(state, actions);
+    }
+
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
     const float height = ImGui::GetFrameHeight() + ImGui::GetStyle().WindowPadding.y;
     if (ImGui::BeginViewportSideBar("##transport", viewport, ImGuiDir_Up, height, flags)) {
         if (ImGui::BeginMenuBar()) {
-            // Disabled, not faked: pressing Play must make real sound or do nothing.
+            ImGui::BeginDisabled(!running);
+            if (ImGui::SmallButton(state.engine.playing ? "Playing" : "Play")) actions.commands.push_back({EngineCommandType::Play, 0.0});
+            if (ImGui::SmallButton("Stop")) actions.commands.push_back({EngineCommandType::Stop, 0.0});
+            if (ImGui::SmallButton("Rewind")) actions.commands.push_back({EngineCommandType::Rewind, 0.0});
+            ImGui::EndDisabled();
+            // Disabled, not faked: Record must capture real audio or do nothing.
             ImGui::BeginDisabled();
-            ImGui::SmallButton("Play");
-            ImGui::SmallButton("Stop");
             ImGui::SmallButton("Record");
             ImGui::EndDisabled();
-            ImGui::SetItemTooltip("Transport arrives with the audio engine in Phase 01.");
+            ImGui::SetItemTooltip("Recording arrives in Phase 04.");
             ImGui::Separator();
-            ImGui::Text("Audio: %s", engine::audioStatusText(kAudioStatus));
+
+            const auto beat = static_cast<std::int64_t>(std::floor(state.engine.positionBeats));
+            const double seconds = state.engine.sampleRate > 0.0 ? static_cast<double>(state.engine.positionFrames) / state.engine.sampleRate : 0.0;
+            ImGui::Text("%3lld.%d   %02d:%06.3f", static_cast<long long>(beat / 4 + 1), static_cast<int>(beat % 4) + 1,
+                        static_cast<int>(seconds / 60.0), std::fmod(seconds, 60.0));
             ImGui::Separator();
-            ImGui::Text("Audio load: n/a");
+
+            ImGui::BeginDisabled(!running);
+            bool metronome = state.engine.metronome;
+            if (ImGui::Checkbox("Metronome", &metronome)) actions.commands.push_back({EngineCommandType::SetMetronome, metronome ? 1.0 : 0.0});
+            bool tone = state.engine.testTone;
+            if (ImGui::Checkbox("Test tone", &tone)) actions.commands.push_back({EngineCommandType::SetTestTone, tone ? 1.0 : 0.0});
+            ImGui::SetNextItemWidth(ImGui::GetFontSize() * 4.0f);
+            if (!ImGui::IsAnyItemActive() || !ImGui::IsWindowFocused()) state.bpmInput = state.engine.bpm > 0.0 ? state.engine.bpm : state.bpmInput;
+            ImGui::InputDouble("BPM", &state.bpmInput, 0.0, 0.0, "%.1f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) actions.commands.push_back({EngineCommandType::SetTempo, state.bpmInput});
+            ImGui::TextUnformatted("4/4");
+            ImGui::EndDisabled();
             ImGui::Separator();
+
+            ImGui::Text("Audio: %s", engine::audioStatusText(state.audio.status));
+            if (!state.audio.message.empty()) ImGui::SetItemTooltip("%s", state.audio.message.c_str());
+            ImGui::Separator();
+            if (running) ImGui::Text("Audio load: %.1f%% (p99)", state.loadP99);
+            else ImGui::TextUnformatted("Audio load: n/a");
+            ImGui::Separator();
+            if (state.xrunsEngine + state.xrunsDevice + state.xrunsUnknown > 0) {
+                ImGui::Text("Dropouts: %llu", static_cast<unsigned long long>(state.xrunsEngine + state.xrunsDevice + state.xrunsUnknown));
+                ImGui::Separator();
+            }
             ImGui::Text("Process CPU: %.1f%% of system", state.process.processCpuOfSystem);
             ImGui::Separator();
             ImGui::Text("RAM: %.0f MiB", toMiB(state.process.workingSetBytes));
@@ -96,7 +150,33 @@ void drawNotImplemented(const char* what, int phase) {
 }
 
 void drawDiagnostics(UiState& state, UiActions& actions) {
-    ImGui::Text("Audio: %s", engine::audioStatusText(kAudioStatus));
+    ImGui::Text("Audio: %s", engine::audioStatusText(state.audio.status));
+    if (!state.audio.message.empty()) ImGui::TextWrapped("%s", state.audio.message.c_str());
+    if (audioRunning(state) && ImGui::BeginTable("##audio", 2, ImGuiTableFlags_SizingStretchProp)) {
+        const engine::AudioStreamInfo& stream = state.audio.stream;
+        const auto row = [](const char* label, const char* format, auto... values) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(label);
+            ImGui::TableNextColumn();
+            ImGui::Text(format, values...);
+        };
+        row("Device", "%s (%s)", stream.deviceName.c_str(), stream.backendName.c_str());
+        row("Stream", "%.0f Hz, %u frames (%.2f ms), %u channels, %s%s", stream.sampleRate, stream.periodFrames,
+            1000.0 * stream.periodFrames / stream.sampleRate, stream.channels, stream.deviceFormat.c_str(),
+            stream.systemResampling ? ", Windows resampling" : "");
+        row("Priority", "%s", stream.realtimePriority ? "real-time (Pro Audio)" : "normal: real-time priority was refused");
+        row("Audio load", "p50 %.1f%%, p95 %.1f%%, p99 %.1f%%, peak %.1f%% of deadline", state.loadP50, state.loadP95, state.loadP99, state.loadPeak);
+        row("Dropouts", "%llu engine, %llu device, %llu unknown, over %llu callbacks", static_cast<unsigned long long>(state.xrunsEngine),
+            static_cast<unsigned long long>(state.xrunsDevice), static_cast<unsigned long long>(state.xrunsUnknown), static_cast<unsigned long long>(state.callbacks));
+        row("Output peak", "%.3f", state.outputPeak);
+        ImGui::EndTable();
+    }
+    for (const engine::XrunEvent& event : state.recentXruns) {
+        ImGui::BulletText("Dropout at %.3f s: %s, load %.0f%%", event.streamSeconds, engine::xrunCauseText(event.cause), event.loadPercent);
+    }
+    if (state.audio.offlineTestRunning) ImGui::TextUnformatted("Offline test running...");
+    else if (!state.audio.offlineTestResult.empty()) ImGui::TextWrapped("Offline test: %s", state.audio.offlineTestResult.c_str());
     ImGui::Separator();
 
     if (ImGui::BeginTable("##diag", 2, ImGuiTableFlags_SizingStretchProp)) {
@@ -207,7 +287,58 @@ void drawPreferences(UiState& state, UiActions& actions) {
         if (ImGui::RadioButton("15 Hz", &state.idleHz, 15)) actions.preferencesChanged = true;
 
         ImGui::SeparatorText("Audio");
-        ImGui::Text("Device: %s", engine::audioStatusText(kAudioStatus));
+        std::string currentName = "Windows default";
+        for (const engine::AudioDeviceInfo& device : state.audio.devices) {
+            if (device.id == state.audioDeviceId) currentName = device.name;
+        }
+        if (ImGui::BeginCombo("Output device", currentName.c_str())) {
+            if (ImGui::Selectable("Windows default", state.audioDeviceId.empty())) {
+                state.audioDeviceId.clear();
+                actions.audioConfigChanged = true;
+            }
+            for (const engine::AudioDeviceInfo& device : state.audio.devices) {
+                ImGui::PushID(device.id.c_str());
+                if (ImGui::Selectable(device.name.c_str(), device.id == state.audioDeviceId)) {
+                    state.audioDeviceId = device.id;
+                    actions.audioConfigChanged = true;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndCombo();
+        }
+        static constexpr int kRates[] = {0, 44100, 48000, 96000};
+        const auto rateLabel = [](int rate) {
+            return rate == 0 ? std::string("Device setting") : std::to_string(rate) + " Hz";
+        };
+        if (ImGui::BeginCombo("Sample rate", rateLabel(state.audioRate).c_str())) {
+            for (const int rate : kRates) {
+                if (ImGui::Selectable(rateLabel(rate).c_str(), rate == state.audioRate)) {
+                    state.audioRate = rate;
+                    actions.audioConfigChanged = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        static constexpr int kSizes[] = {128, 256, 512, 1024};
+        if (ImGui::BeginCombo("Buffer size", std::to_string(state.audioFrames).c_str())) {
+            for (const int size : kSizes) {
+                if (ImGui::Selectable(std::to_string(size).c_str(), size == state.audioFrames)) {
+                    state.audioFrames = size;
+                    actions.audioConfigChanged = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (audioRunning(state)) {
+            const engine::AudioStreamInfo& stream = state.audio.stream;
+            ImGui::Text("Running at %.0f Hz with %u frames (%.2f ms).", stream.sampleRate, stream.periodFrames, 1000.0 * stream.periodFrames / stream.sampleRate);
+            if (static_cast<int>(stream.periodFrames) != state.audioFrames) {
+                ImGui::TextWrapped("This device's driver does not offer %d frames in shared mode, so the closest available size is used.", state.audioFrames);
+            }
+        } else {
+            ImGui::Text("Status: %s", engine::audioStatusText(state.audio.status));
+            if (!state.audio.message.empty()) ImGui::TextWrapped("%s", state.audio.message.c_str());
+        }
     }
     ImGui::End();
 }
@@ -230,7 +361,7 @@ void drawNotice(WorkspaceManager& workspaces) {
 UiActions drawInterface(WorkspaceManager& workspaces, UiState& state) {
     UiActions actions;
     drawMainMenu(workspaces, state, actions);
-    drawTransportBar(state);
+    drawTransportBar(state, actions);
 
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     const ImGuiID dockspaceId = ImGui::GetID("ldaw.root.dockspace");

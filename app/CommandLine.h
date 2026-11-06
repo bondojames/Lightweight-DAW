@@ -6,7 +6,7 @@
 
 namespace ldaw {
 
-enum class ProfileMode { None, Idle, Active, Minimized, Detached };
+enum class ProfileMode { None, Idle, Active, Minimized, Detached, Playing };
 
 struct CommandLine {
     bool warp = false;                          // Diagnostic software rendering; off by default.

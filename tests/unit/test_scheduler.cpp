@@ -75,3 +75,15 @@ TEST_CASE(configured_rates_are_used_and_zero_is_safe) {
     CHECK(frames >= 14 && frames <= 16);
     CHECK(framesIn(s, 200.0, 5.0) <= 1);
 }
+
+TEST_CASE(playing_draws_at_the_animation_rate_and_input_still_wins) {
+    FrameScheduler s;
+    s.setAnimating(true);
+    CHECK(s.mode(100.0) == Mode::Animating);
+    const int frames = framesIn(s, 100.0, 1.0);
+    CHECK(frames >= 29 && frames <= 31);
+    s.noteActivity(200.0);
+    CHECK(s.mode(200.1) == Mode::Active);
+    s.setMinimized(true);
+    CHECK(s.mode(300.0) == Mode::Hidden);
+}

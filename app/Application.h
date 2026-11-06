@@ -2,6 +2,7 @@
 #pragma once
 #include "app/CommandLine.h"
 #include "core/settings/KeyValueStore.h"
+#include "engine/device/AudioService.h"
 #include "platform/win32/ProcessMetrics.h"
 #include "platform/win32/WindowHost.h"
 #include "renderer/d3d11/D3D11Device.h"
@@ -15,6 +16,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -41,6 +43,8 @@ private:
     void sampleMetrics();
     void recoverDevice(double time);
     void handleDrops();
+    void applyAudioConfig();
+    void updateAudioState();
 
     void beginProfileWindow();
     bool finishProfile();
@@ -57,6 +61,9 @@ private:
     FrameScheduler scheduler_;
     platform::ProcessMetrics metrics_;
     ui::UiState uiState_;
+    std::unique_ptr<engine::AudioService> audio_;
+    std::uint64_t seenAudioGeneration_ = 0;
+    std::filesystem::path offlineWavPending_;
 
     std::chrono::steady_clock::time_point start_;
     double nextMetricsAt_ = 0.0;
@@ -80,6 +87,7 @@ private:
     // Measurement window for --profile.
     std::optional<platform::ProcessMetrics> profileMetrics_; // Separate baseline; sampled only at the end.
     bool profileMeasuring_ = false;
+    bool profilePlayStarted_ = false;
     double profileStart_ = 0.0;
     double profileEndAt_ = 0.0;
     std::uint64_t profileFramesAtStart_ = 0;
@@ -95,6 +103,7 @@ private:
         const char* name;
         std::function<void()> act;
         std::function<bool()> check;
+        std::uint64_t settleFrames = 12;
     };
     std::vector<SelfTestStep> selfTestSteps_;
     std::size_t selfTestIndex_ = 0;

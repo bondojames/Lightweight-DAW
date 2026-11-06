@@ -6,7 +6,7 @@ param(
     [string]$OutDir = "$PSScriptRoot\..\build\profile",
     [int]$SettleSeconds = 60,
     [int]$ProfileSeconds = 60,
-    [string[]]$Modes = @('idle', 'active', 'minimized', 'detached')
+    [string[]]$Modes = @('idle', 'active', 'minimized', 'detached', 'playing')
 )
 $ErrorActionPreference = 'Stop'
 $Modes = $Modes -split ','

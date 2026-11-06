@@ -27,7 +27,7 @@ endif()
 configure_file(cmake/BuildInfo.h.in ${CMAKE_BINARY_DIR}/generated/BuildInfo.h)
 
 add_library(ldaw_warnings INTERFACE)
-target_compile_options(ldaw_warnings INTERFACE /W4 /WX /permissive- /utf-8 /Zc:__cplusplus)
+target_compile_options(ldaw_warnings INTERFACE /W4 /WX /wd4324 /permissive- /utf-8 /Zc:__cplusplus)
 target_compile_definitions(ldaw_warnings INTERFACE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_include_directories(ldaw_warnings INTERFACE ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/generated)
 
@@ -40,6 +40,18 @@ add_library(ldaw_core STATIC
   core/logging/Log.cpp
 )
 target_link_libraries(ldaw_core PUBLIC ldaw_warnings)
+
+add_library(ldaw_engine STATIC
+  engine/AudioEngine.cpp
+  engine/render/OfflineRender.cpp
+  engine/device/WasapiBackend.cpp
+  engine/device/AudioService.cpp
+)
+target_link_libraries(ldaw_engine PUBLIC ldaw_warnings PRIVATE avrt ole32 uuid)
+
+# Real-device test tool. Links no ImGui or Direct3D.
+add_executable(LightweightDAW_audiotest tools/audiotest/main.cpp)
+target_link_libraries(LightweightDAW_audiotest PRIVATE ldaw_engine ole32 uuid)
 
 add_library(ldaw_engine_api INTERFACE)
 target_link_libraries(ldaw_engine_api INTERFACE ldaw_warnings)
@@ -83,7 +95,7 @@ if(LDAW_BUILD_APP)
     app/LightweightDAW.manifest
   )
   target_link_libraries(LightweightDAW PRIVATE
-    ldaw_core ldaw_engine_api ldaw_plugins_api ldaw_ui_logic ldaw_platform ldaw_renderer imgui_docking)
+    ldaw_core ldaw_engine ldaw_engine_api ldaw_plugins_api ldaw_ui_logic ldaw_platform ldaw_renderer imgui_docking)
 
   # Launches the real window on the software rasterizer, so this also runs on CI
   # runners without a GPU. Hardware runs are measured by tools/profile.ps1.

@@ -13,13 +13,12 @@
 #include <imgui_internal.h>
 
 #include <filesystem>
+#include <memory>
 #include <format>
 #include <string>
 
 namespace ldaw {
 namespace {
-
-constexpr std::uint64_t kFramesToSettle = 12;
 
 const char* windowName(ui::PanelId id) { return ui::panelDefs()[static_cast<std::size_t>(id)].windowName; }
 
@@ -44,7 +43,28 @@ void Application::buildSelfTest() {
     using ui::Workspace;
     const auto layouts = dataDir_ / L"layouts";
 
+    // Silent: audio really runs through the device, at zero output gain. Machines with no
+    // audio device, such as CI runners, must instead show a clear message.
+    const auto audioIsRunning = [this] { return uiState_.audio.status == engine::AudioStatus::Running; };
+    const auto clockIsMoving = [this, audioIsRunning, last = std::make_shared<std::int64_t>(-1)] {
+        if (!audioIsRunning()) return !uiState_.audio.message.empty();
+        const std::int64_t position = audio_->engineState().positionFrames;
+        const bool moved = position > *last;
+        *last = position;
+        return moved && audio_->engineState().playing;
+    };
+
     selfTestSteps_ = {
+        {"audio reports its state: running, or a clear message", [] {},
+         [this, audioIsRunning] { return uiState_.audio.status != engine::AudioStatus::NotInitialized && (audioIsRunning() || !uiState_.audio.message.empty()); },
+         240},
+        {"Play starts the sample clock",
+         [this] {
+             audio_->post({engine::EngineCommandType::SetOutputGain, 0.0});
+             audio_->post({engine::EngineCommandType::SetMetronome, 1.0});
+             audio_->post({engine::EngineCommandType::Play, 0.0});
+         },
+         clockIsMoving},
         {"factory Production layout docks its panels", [] {},
          [this] {
              return workspaces_.current() == Workspace::Production && isDocked(PanelId::Timeline) && isDocked(PanelId::Library) &&
@@ -69,6 +89,7 @@ void Application::buildSelfTest() {
         {"GPU reset keeps the UI and detached panel",
          [this] { simulateDeviceLoss_ = true; },
          [this] { return uiState_.deviceRecoveries == 1 && !deviceLost_ && isFloatingInOwnWindow(PanelId::Diagnostics); }},
+        {"the audio clock kept running through the GPU reset and workspace changes", [] {}, clockIsMoving},
         {"a panel stranded by a monitor change comes back",
          [this] {
              if (ImGuiWindow* window = findPanel(PanelId::Diagnostics)) ImGui::SetWindowPos(window, ImVec2(30000.0f, 30000.0f));
@@ -115,6 +136,9 @@ void Application::buildSelfTest() {
              ShowWindow(window_.hwnd(), SW_RESTORE);
          },
          [this] { return !window_.isMinimized() && !deviceLost_; }},
+        {"the audio clock survived all of the UI work above", [] {}, clockIsMoving},
+        {"Stop halts the clock", [this] { audio_->post({engine::EngineCommandType::Stop, 0.0}); },
+         [this, audioIsRunning] { return !audioIsRunning() || !audio_->engineState().playing; }},
     };
 }
 
@@ -132,7 +156,7 @@ void Application::stepSelfTest(double time) {
     if (!selfTestActed_) {
         step.act();
         selfTestActed_ = true;
-        selfTestCheckAtFrame_ = framesTotal_ + kFramesToSettle;
+        selfTestCheckAtFrame_ = framesTotal_ + step.settleFrames;
         return;
     }
     if (framesTotal_ < selfTestCheckAtFrame_) return;

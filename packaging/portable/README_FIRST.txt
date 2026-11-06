@@ -1,9 +1,9 @@
-LightweightDAW (working title) - Phase 00 build
+LightweightDAW (working title) - Phase 01 build
 
 WHAT THIS IS
-The application shell only: windows, docking, workspaces and diagnostics.
-It does not make sound yet. Audio status correctly reads "not initialized".
-Audio arrives in Phase 01.
+The application shell plus real audio output: a transport, a metronome and a
+test tone through your choice of Windows audio device. There are no tracks,
+recording or projects yet.
 
 HOW TO RUN
 1. Extract this whole ZIP to any folder.
@@ -14,11 +14,22 @@ SUPPORTED
 Windows 11, x64, with a Direct3D 11 graphics driver. No account, no telemetry.
 
 WHAT TO TRY
+Turn your volume down first.
+- Tick Metronome and press Play or the Space bar.
+- Tick Test tone for a steady, quiet 440 Hz note.
+- Audio menu: choose the output device, sample rate and buffer size.
+- Diagnostics panel: audio load, dropouts by cause, and what the driver really gave.
+- Audio menu: run the offline metronome test, which needs no audio device.
 - Drag a panel's tab to dock it elsewhere, or out of the window to detach it.
 - Workspace menu: switch between Production and Live, or Reset Workspace.
-- File menu: test the Open and Save dialogs (no project files yet).
-- Drop a file on the main window; it appears in the Diagnostics panel.
-- Close and reopen the app: your layout comes back.
+
+BUFFER SIZES
+Many Windows drivers only offer 10 ms (about 480 frames) in shared mode. The app
+uses the closest size the driver allows and shows you what it got.
+
+TESTING WITHOUT THE WINDOW
+LightweightDAW_audiotest.exe is a console tool for measuring a machine's audio
+path. It is silent unless you pass --gain. Run it with no arguments for its options.
 
 WHERE YOUR SETTINGS GO
 %LOCALAPPDATA%\LightweightDAW
@@ -28,7 +39,7 @@ next to LightweightDAW.exe (the folder must be writable).
 LICENSE
 GPL-3.0-or-later with a permission for loading non-GPL plug-ins and drivers; see
 LICENSE and LICENSE-EXCEPTION.md. Third-party notices: THIRD_PARTY_NOTICES.md and
-the licenses folder. Source code: see the project repository.
+the licenses folder. Source code: https://github.com/bondojames/Lightweight-DAW
 
 KNOWN ISSUES
 See docs/KNOWN_ISSUES.md in the source repository.

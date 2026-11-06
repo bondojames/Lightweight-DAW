@@ -5,6 +5,7 @@
 
 #include "BuildInfo.h"
 #include "core/logging/Log.h"
+#include "engine/device/WasapiBackend.h"
 #include "platform/win32/CrashHandler.h"
 #include "platform/win32/NativeDialogs.h"
 #include "platform/win32/ShellIntegration.h"
@@ -51,12 +52,19 @@ void Application::loadPreferences() {
     uiState_.themeId = themeId_;
     uiState_.activeHz = static_cast<int>(config.activeHz);
     uiState_.idleHz = static_cast<int>(config.idleHz);
+
+    uiState_.audioDeviceId = preferences_.getString("audio.device", "");
+    uiState_.audioRate = preferences_.getInt("audio.rate", 0);
+    uiState_.audioFrames = std::clamp(preferences_.getInt("audio.frames", 256), 16, 8192);
 }
 
 void Application::savePreferences() {
     preferences_.setInt("ui.theme", themeId_);
     preferences_.setInt("ui.activeHz", static_cast<int>(scheduler_.config().activeHz));
     preferences_.setInt("ui.idleHz", static_cast<int>(scheduler_.config().idleHz));
+    preferences_.setString("audio.device", uiState_.audioDeviceId);
+    preferences_.setInt("audio.rate", uiState_.audioRate);
+    preferences_.setInt("audio.frames", uiState_.audioFrames);
     if (window_.hwnd()) {
         const IntRect bounds = window_.restoredBounds();
         preferences_.setInt("window.x", bounds.x);
@@ -142,6 +150,9 @@ bool Application::initialize(int showCommand) {
         insideModalTick_ = false;
     });
 
+    audio_ = std::make_unique<engine::AudioService>(std::make_unique<engine::WasapiBackend>());
+    applyAudioConfig();
+
     const std::string startWorkspace = preferences_.getString("ui.workspace", "production");
     workspaces_.initialize(dataDir_ / L"layouts",
                            startWorkspace == "live" ? ui::Workspace::Live : ui::Workspace::Production,
@@ -165,6 +176,7 @@ bool Application::initialize(int showCommand) {
 }
 
 void Application::shutdown() {
+    audio_.reset();
     if (imgui_.isInitialized()) {
         workspaces_.save();
         preferences_.setString("ui.workspace", workspaces_.current() == ui::Workspace::Live ? "live" : "production");
@@ -204,7 +216,30 @@ void Application::updateFrameState(double time) {
     }
     scheduler_.setMinimized(minimized);
     scheduler_.setOccluded(occluded_);
+    updateAudioState();
+    scheduler_.setAnimating(uiState_.engine.playing);
     scheduler_.setHasSecondaryViewports(ImGui::GetPlatformIO().Viewports.Size > 1);
+}
+
+void Application::applyAudioConfig() {
+    engine::AudioStreamConfig config;
+    config.outputDeviceId = uiState_.audioDeviceId;
+    config.sampleRate = uiState_.audioRate;
+    config.requestedFrames = static_cast<std::uint32_t>(uiState_.audioFrames);
+    audio_->open(config);
+}
+
+void Application::updateAudioState() {
+    if (!audio_) return;
+    uiState_.engine = audio_->engineState();
+    const std::uint64_t generation = audio_->stateGeneration();
+    if (generation == seenAudioGeneration_) return;
+    seenAudioGeneration_ = generation;
+    const engine::AudioStatus previous = uiState_.audio.status;
+    uiState_.audio = audio_->state();
+    if (uiState_.audio.status != previous || !uiState_.audio.message.empty()) {
+        log::info(std::format("Audio {}: {} {}", engine::audioStatusText(uiState_.audio.status), uiState_.audio.stream.deviceName, uiState_.audio.message));
+    }
 }
 
 void Application::handleDrops() {
@@ -271,6 +306,15 @@ void Application::applyActions(const ui::UiActions& actions) {
     if (actions.exit) exitRequested_ = true;
     if (actions.dialog != ui::DialogRequest::None) pendingDialog_ = actions.dialog;
     if (actions.simulateDeviceLoss) simulateDeviceLoss_ = true;
+    if (audio_) {
+        for (const engine::EngineCommand& command : actions.commands) {
+            if (!audio_->post(command)) log::error("Audio command queue is full; a command was dropped");
+        }
+        if (actions.audioConfigChanged) {
+            applyAudioConfig();
+            savePreferences();
+        }
+    }
     if (actions.preferencesChanged) {
         themeId_ = uiState_.themeId;
         ui::applyTheme(themeId_, appliedDpiScale_);
@@ -289,6 +333,15 @@ void Application::runPendingDialog() {
 
     const auto result = request == ui::DialogRequest::Open ? platform::showOpenFileDialog(window_.hwnd())
                                                            : platform::showSaveFileDialog(window_.hwnd());
+    if (request == ui::DialogRequest::OfflineTestWav) {
+        if (result) {
+            auto path = *result;
+            if (!path.has_extension()) path += L".wav";
+            audio_->runOfflineTest(path);
+        }
+        scheduler_.noteActivity(now());
+        return;
+    }
     uiState_.lastDialogResult = result ? platform::toUtf8(result->wstring()) : std::string("(cancelled)");
     log::info(std::format("{} dialog returned: {}", request == ui::DialogRequest::Open ? "Open" : "Save", uiState_.lastDialogResult));
     scheduler_.noteActivity(now());
@@ -307,6 +360,24 @@ void Application::sampleMetrics() {
     uiState_.framesTotal = framesTotal_;
     uiState_.monitorCount = static_cast<int>(platform::WindowHost::monitorWorkAreas().size());
     uiState_.dpiScale = appliedDpiScale_;
+    if (audio_) {
+        engine::AudioTelemetry& telemetry = audio_->telemetry();
+        uiState_.loadP50 = telemetry.loadPercentile(0.50);
+        uiState_.loadP95 = telemetry.loadPercentile(0.95);
+        uiState_.loadP99 = telemetry.loadPercentile(0.99);
+        uiState_.loadPeak = telemetry.peakLoad();
+        uiState_.callbacks = telemetry.callbacks();
+        uiState_.xrunsEngine = telemetry.xruns(engine::XrunCause::Engine);
+        uiState_.xrunsDevice = telemetry.xruns(engine::XrunCause::Device);
+        uiState_.xrunsUnknown = telemetry.xruns(engine::XrunCause::Unknown);
+        uiState_.outputPeak = audio_->takeOutputPeak();
+        engine::XrunEvent event;
+        while (telemetry.popXrun(event)) {
+            log::error(std::format("Audio dropout at {:.3f} s: {}, load {:.0f}%", event.streamSeconds, engine::xrunCauseText(event.cause), event.loadPercent));
+            uiState_.recentXruns.insert(uiState_.recentXruns.begin(), event);
+            if (uiState_.recentXruns.size() > 8) uiState_.recentXruns.pop_back();
+        }
+    }
     buildMsSum_ = renderMsSum_ = presentMsSum_ = 0.0;
     framesSinceSample_ = 0;
     lastSampleTime_ = time;
@@ -338,6 +409,7 @@ void Application::recoverDevice(double time) {
 
 void Application::beginProfileWindow() {
     profileMetrics_.emplace(1); // Baseline is now; everything before is discarded.
+    if (audio_) audio_->telemetry().reset();
     profileMeasuring_ = true;
     profileStart_ = now();
     profileEndAt_ = profileStart_ + args_.profileSeconds;
@@ -366,7 +438,9 @@ bool Application::finishProfile() {
         sample.processCpuOfOneCore, sample.processCpuOfSystem, sample.uiThreadCpuOfOneCore, profileBuildMs_ / divisor,
         profileRenderMs_ / divisor, profilePresentMs_ / divisor, profileDrawCalls_, profileMaxViewports_,
         static_cast<double>(sample.workingSetBytes) / 1048576.0, static_cast<double>(profileMaxWorkingSet_) / 1048576.0,
-        static_cast<double>(sample.privateBytes) / 1048576.0, window_.isMinimized() ? "true" : "false");
+        static_cast<double>(sample.privateBytes) / 1048576.0, window_.isMinimized() ? "true" : "false",
+        engine::audioStatusText(uiState_.audio.status), uiState_.audio.stream.deviceName, uiState_.audio.stream.sampleRate, uiState_.audio.stream.periodFrames,
+        audio_->telemetry().loadPercentile(0.99), audio_->telemetry().peakLoad(), audio_->telemetry().xruns(engine::XrunCause::Engine), audio_->telemetry().xruns(engine::XrunCause::Device));
     // Someone restoring the window mid-run would silently invalidate the measurement.
     if (args_.profile == ProfileMode::Minimized && (!window_.isMinimized() || frames != 0)) {
         log::error("Minimized profile is invalid: the window was restored during the run");
@@ -401,6 +475,12 @@ int Application::run(int showCommand) {
                 continue;
             }
             if (args_.profile == ProfileMode::Active) scheduler_.noteActivity(time);
+            if (args_.profile == ProfileMode::Playing && !profilePlayStarted_ && uiState_.audio.status == engine::AudioStatus::Running) {
+                profilePlayStarted_ = true; // Silent: full processing, zero output gain.
+                audio_->post({engine::EngineCommandType::SetOutputGain, 0.0});
+                audio_->post({engine::EngineCommandType::SetMetronome, 1.0});
+                audio_->post({engine::EngineCommandType::Play, 0.0});
+            }
         }
 
         if (args_.uiSelfTest) {

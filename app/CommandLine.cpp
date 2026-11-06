@@ -25,6 +25,7 @@ CommandLine parseCommandLine(int argc, wchar_t** argv) {
             else if (mode == L"active") out.profile = ProfileMode::Active;
             else if (mode == L"minimized") out.profile = ProfileMode::Minimized;
             else if (mode == L"detached") out.profile = ProfileMode::Detached;
+            else if (mode == L"playing") out.profile = ProfileMode::Playing;
             ++i;
         }
     }
@@ -38,6 +39,7 @@ const char* profileModeName(ProfileMode mode) {
     case ProfileMode::Active: return "active";
     case ProfileMode::Minimized: return "minimized";
     case ProfileMode::Detached: return "detached";
+    case ProfileMode::Playing: return "playing";
     }
     return "unknown";
 }
